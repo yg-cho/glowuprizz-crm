@@ -1,10 +1,9 @@
 import { CHANNEL_LABELS, EVENT_LABELS as LABEL, STAGES as ORDER, type Channel, type Stage } from '@glowuprizz/shared';
 import { cn } from '@/lib/utils';
+import { fmtDayTime, fmtTime } from '@/lib/format';
 import type { JourneyEvent } from '@/lib/api';
 const REASON: Record<string, string> = { network: '네트워크', http: '서버 응답' };
 
-const time = (iso: string) => new Date(iso).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-const timeOnly = (iso: string) => new Date(iso).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
 
 /**
  * 방문자 이벤트를 가로 타임라인으로. 재방문(VIEW 반복)은 '재방문'으로, 마지막 도달 단계 뒤에는 도달 못 한 단계를 빈 원으로 붙인다.
@@ -17,7 +16,7 @@ export function JourneyTimeline({ events }: { events: JourneyEvent[] }) {
   let prevDay = '';
   for (const e of events) {
     const day = e.createdAt.slice(0, 10);
-    const t = day !== prevDay ? time(e.createdAt) : timeOnly(e.createdAt);
+    const t = day !== prevDay ? fmtDayTime(e.createdAt) : fmtTime(e.createdAt);
     prevDay = day;
     if (e.type === 'VIEW') {
       views += 1;

@@ -1,6 +1,8 @@
 'use client';
 
 import { Suspense, useState } from 'react';
+import { useAction } from '@/lib/use-api';
+import { ErrorText } from '@/components/error-text';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { api, ApiError } from '@/lib/api';
 import { Button } from '@/components/ui/button';
@@ -13,25 +15,17 @@ function LoginForm() {
   const params = useSearchParams();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setError(null);
+  const login = useAction(async () => {
     try {
       await api.post('/auth/login', { email, password });
-      router.push(params.get('next') || '/');
     } catch (err) {
-      setError(err instanceof ApiError && err.status === 401 ? '이메일 또는 비밀번호가 올바르지 않습니다.' : '로그인에 실패했습니다.');
-    } finally {
-      setLoading(false);
+      throw err instanceof ApiError && err.status === 401 ? new ApiError(401, '이메일 또는 비밀번호가 올바르지 않습니다.') : err;
     }
-  };
+    router.push(params.get('next') || '/');
+  }, '로그인에 실패했습니다.');
 
   return (
-    <form onSubmit={submit} className="flex flex-col gap-4">
+    <form onSubmit={(e) => { e.preventDefault(); login.run(); }} className="flex flex-col gap-4">
       <div>
         <Label htmlFor="email">이메일</Label>
         <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="username" />
@@ -40,8 +34,8 @@ function LoginForm() {
         <Label htmlFor="password">비밀번호</Label>
         <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required autoComplete="current-password" />
       </div>
-      {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
-      <Button type="submit" disabled={loading}>{loading ? '로그인 중…' : '로그인'}</Button>
+      <ErrorText>{login.error}</ErrorText>
+      <Button type="submit" disabled={login.busy}>{login.busy ? '로그인 중…' : '로그인'}</Button>
     </form>
   );
 }

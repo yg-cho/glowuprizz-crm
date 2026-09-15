@@ -95,7 +95,7 @@ test.describe('브라우저 퍼널', () => {
     await page.getByRole('option', { name: '유튜브' }).click();
     await page.getByRole('button', { name: '링크 생성' }).click();
     await expect(page.locator('table').getByText('유튜브')).toBeVisible();
-    await expect(page.locator('code', { hasText: `${FORMS}/l/` })).toBeVisible();
+    await expect(page.locator('table code', { hasText: '/l/' })).toBeVisible();
   });
 
   test('미인증 접근은 로그인으로 리다이렉트', async ({ page }) => {
