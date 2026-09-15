@@ -1,12 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { customAlphabet } from 'nanoid';
+import { LINK_CODE_ALPHABET, LINK_CODE_LENGTH } from '@glowuprizz/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { OwnershipService } from '../common/ownership.service';
 import { CreateLinkDto } from './dto/create-link.dto';
 
-// 대소문자 혼동 문자(0/O, 1/l/I) 제외
-const linkCode = customAlphabet('23456789abcdefghjkmnpqrstuvwxyz', 8);
+const linkCode = customAlphabet(LINK_CODE_ALPHABET, LINK_CODE_LENGTH);
 
 @Injectable()
 export class LinksService {

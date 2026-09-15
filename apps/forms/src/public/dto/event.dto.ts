@@ -1,13 +1,13 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { CLIENT_EVENT_TYPES, ClientEventType, LINK_CODE_PATTERN } from '@glowuprizz/shared';
 import { IsIn, IsObject, IsOptional, IsString, Matches } from 'class-validator';
 
-import { CLIENT_EVENT_TYPES, ClientEventType } from '@glowuprizz/shared';
 
 export class EventDto {
   @ApiProperty({ required: false, example: 'k3m9pq2x' })
   @IsOptional()
   @IsString()
-  @Matches(/^[a-z0-9]{4,32}$/)
+  @Matches(LINK_CODE_PATTERN)
   linkCode?: string | null;
 
   @ApiProperty({ enum: CLIENT_EVENT_TYPES })

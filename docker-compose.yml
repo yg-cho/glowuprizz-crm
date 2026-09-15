@@ -48,7 +48,7 @@ services:
       PORT: 3002
       NODE_ENV: production
       DATABASE_URL: postgresql://glow:glow@postgres:5432/glowuprizz
-      IP_HASH_SALT: ${IP_HASH_SALT:-change-me}
+      IP_HASH_SALT: ${IP_HASH_SALT:-dev-salt-change-me-0123456789}
     ports: ["3002:3002"]
     depends_on:
       api: { condition: service_healthy }

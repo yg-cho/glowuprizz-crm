@@ -59,8 +59,16 @@ export interface FunnelStage {
 // ---------------------------------------------------------------- 쿠키 / 업로드
 export const VISITOR_COOKIE = 'gu_vid';
 export const AUTH_COOKIE = 'gu_admin';
-/** gu_vid 값 형식 (UUID v4) */
-export const VISITOR_ID_PATTERN = /^[0-9a-f-]{36}$/;
+/** gu_vid 값 형식 (UUID v4 엄격) */
+export const VISITOR_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+
+/** 배포 링크 코드: 대소문자 혼동 문자(0/O, 1/l/I) 제외, 8자 */
+export const LINK_CODE_ALPHABET = '23456789abcdefghjkmnpqrstuvwxyz';
+export const LINK_CODE_LENGTH = 8;
+export const LINK_CODE_PATTERN = new RegExp(`^[${LINK_CODE_ALPHABET}]{${LINK_CODE_LENGTH}}$`);
+
+/** 공개 폼 POST 에 요구하는 토큰 헤더. 주입 스크립트가 slug·방문자에 바인딩된 값을 실어 보낸다. */
+export const FORM_TOKEN_HEADER = 'x-gu-token';
 
 /** 업로드 HTML 최대 크기 (bytes) */
 export const MAX_HTML_BYTES = 512 * 1024;
