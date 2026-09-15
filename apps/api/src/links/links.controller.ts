@@ -1,13 +1,12 @@
-import { Body, Controller, Delete, Get, HttpCode, Param, ParseUUIDPipe, Post, Query, UseGuards } from '@nestjs/common';
-import { ApiCookieAuth, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { Body, Controller, Delete, Get, HttpCode, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
+import { ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { CurrentOperator, OperatorPrincipal } from '../common/current-operator.decorator';
+import { OperatorApi } from '../common/operator-api.decorator';
 import { LinksService } from './links.service';
 import { CreateLinkDto } from './dto/create-link.dto';
 
 @ApiTags('links')
-@ApiCookieAuth('gu_admin')
-@UseGuards(JwtAuthGuard)
+@OperatorApi()
 @Controller('links')
 export class LinksController {
   constructor(private readonly links: LinksService) {}

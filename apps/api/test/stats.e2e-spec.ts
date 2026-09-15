@@ -196,6 +196,16 @@ describe('Funnel stats (e2e)', () => {
     await get(`/api/submissions/00000000-0000-0000-0000-000000000000/journey`).expect(404);
   });
 
+  it('submissions: channel 필터는 서버에서, 잘못된 값은 400', async () => {
+    const ig = (await get(`/api/submissions?channel=INSTAGRAM`).expect(200)).body;
+    expect(ig.items.every((s: { link: { channel: string } }) => s.link.channel === 'INSTAGRAM')).toBe(true);
+    expect(ig.total).toBeGreaterThanOrEqual(1);
+    const yt = (await get(`/api/submissions?channel=YOUTUBE`).expect(200)).body;
+    expect(yt.total).toBe(1);
+    await get(`/api/submissions?channel=TIKTOK`).expect(400);
+    await get(`/api/submissions?pageSize=1000`).expect(400);
+  });
+
   it('실패: 잘못된 range / from>to / 남의 캠페인 / 잘못된 채널', async () => {
     await get(`/api/stats/funnel?range=1y`).expect(400);
     await get(`/api/stats/funnel?range=custom&from=2026-09-10&to=2026-09-01`).expect(400);

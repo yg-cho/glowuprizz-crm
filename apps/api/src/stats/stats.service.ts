@@ -1,30 +1,27 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { Prisma } from '@glowuprizz/db';
-import { CHANNELS, CHANNEL_LABELS, Channel, EVENT_RANK, STAGES, STAGE_LABELS, Stage, StageCounts } from '@glowuprizz/shared';
+import { CHANNELS, CHANNEL_LABELS, Channel, STAGES, Stage } from '@glowuprizz/shared';
 import { PrismaService } from '../prisma/prisma.service';
+import { OwnershipService } from '../common/ownership.service';
+import { normalizePage } from '../common/pagination';
 import { StatsQueryDto, VisitorsQueryDto } from './dto/stats-query.dto';
 import { Period, resolvePeriod } from './period';
-
-const emptyStages = (): StageCounts => ({ VIEW: 0, FORM_VIEW: 0, FORM_START: 0, SUBMIT_ATTEMPT: 0, SUBMIT_SUCCESS: 0 });
-const rate = (n: number, d: number) => (d === 0 ? 0 : Math.round((n / d) * 10000) / 10000);
-const num = (v: unknown) => Number(v ?? 0);
+import { StageGroup, emptyGroup, funnelSnapshot, kstDay, num, rate, stageList } from './metrics';
+import { loadJourney } from './journey';
 
 interface Scope { operatorId: string; campaignId?: string; formId?: string; channel?: Channel }
 type TypeRow = { key: string | null; type: string; visitors: bigint; events: bigint };
 
 @Injectable()
 export class StatsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService, private readonly own: OwnershipService) {}
 
   // ---------------------------------------------------------------- scope / SQL
 
+  /** 필터의 캠페인/폼이 내 소유인지 확인하고 SQL 범위 객체로 */
   private async scope(operatorId: string, q: StatsQueryDto): Promise<Scope> {
-    if (q.campaignId && !(await this.prisma.campaign.findFirst({ where: { id: q.campaignId, operatorId }, select: { id: true } }))) {
-      throw new NotFoundException('campaign not found');
-    }
-    if (q.formId && !(await this.prisma.form.findFirst({ where: { id: q.formId, campaign: { operatorId } }, select: { id: true } }))) {
-      throw new NotFoundException('form not found');
-    }
+    if (q.campaignId) await this.own.campaign(operatorId, q.campaignId);
+    if (q.formId) await this.own.form(operatorId, q.formId);
     return { operatorId, campaignId: q.campaignId, formId: q.formId, channel: q.channel };
   }
 
@@ -56,10 +53,10 @@ export class StatsService {
       SELECT ${keyExpr}::text AS key, type::text AS type, COUNT(DISTINCT "visitorId") AS visitors, COUNT(*) AS events
       FROM ev ${extraWhere}
       GROUP BY 1, 2`);
-    const byKey = new Map<string | null, { stages: StageCounts; events: StageCounts; errors: number }>();
+    const byKey = new Map<string | null, StageGroup>();
     for (const r of rows) {
       const k = r.key;
-      if (!byKey.has(k)) byKey.set(k, { stages: emptyStages(), events: emptyStages(), errors: 0 });
+      if (!byKey.has(k)) byKey.set(k, emptyGroup());
       const g = byKey.get(k)!;
       if ((STAGES as readonly string[]).includes(r.type)) {
         g.stages[r.type as Stage] = num(r.visitors);
@@ -69,17 +66,14 @@ export class StatsService {
     return byKey;
   }
 
-  private stageList(stages: StageCounts) {
-    const first = stages.VIEW;
-    return STAGES.map((type, i) => {
-      const prev = i === 0 ? null : stages[STAGES[i - 1]];
-      return {
-        type, label: STAGE_LABELS[type], visitors: stages[type],
-        stepRate: prev === null ? 1 : rate(stages[type], prev),
-        cumulativeRate: rate(stages[type], first),
-        dropoff: prev === null ? 0 : Math.max(0, prev - stages[type]),
-      };
-    });
+  /** 그룹 없이 전체 하나 */
+  private async stageGroup(s: Scope, p: Period): Promise<StageGroup> {
+    return (await this.stageCountsBy(null, s, p)).get(null) ?? emptyGroup();
+  }
+
+  /** 그룹 키별 집계를 엔티티 목록에 붙인다 (이벤트 없는 엔티티는 0) */
+  private static attach<T>(list: T[], byKey: Map<string | null, StageGroup>, keyOf: (item: T) => string) {
+    return list.map((item) => ({ item, g: byKey.get(keyOf(item)) ?? emptyGroup() }));
   }
 
   // ---------------------------------------------------------------- endpoints
@@ -88,17 +82,7 @@ export class StatsService {
   async funnel(operatorId: string, q: StatsQueryDto) {
     const s = await this.scope(operatorId, q);
     const { range, current, previous } = resolvePeriod(q);
-    const build = async (p: Period) => {
-      const g = (await this.stageCountsBy(null, s, p)).get(null) ?? { stages: emptyStages(), events: emptyStages(), errors: 0 };
-      const stages = this.stageList(g.stages);
-      const drops = stages.slice(1);
-      const maxDrop = drops.length ? drops.reduce((a, b) => (b.dropoff > a.dropoff ? b : a)) : null;
-      return {
-        stages, pageViews: g.events.VIEW, submitErrors: g.errors,
-        overallRate: rate(g.stages.SUBMIT_SUCCESS, g.stages.VIEW),
-        maxDropStage: maxDrop && maxDrop.dropoff > 0 ? maxDrop.type : null,
-      };
-    };
+    const build = async (p: Period) => funnelSnapshot(await this.stageGroup(s, p));
     return { range, period: current, current: await build(current), previous: previous ? { period: previous, ...(await build(previous)) } : null };
   }
 
@@ -132,7 +116,7 @@ export class StatsService {
     const byKey = await this.stageCountsBy(Prisma.sql`channel`, s, current, Prisma.sql`WHERE channel IS NOT NULL`);
     const totalSubmissions = [...byKey.values()].reduce((a, g) => a + g.stages.SUBMIT_SUCCESS, 0);
     return CHANNELS.map((channel) => {
-      const g = byKey.get(channel) ?? { stages: emptyStages(), events: emptyStages(), errors: 0 };
+      const g = byKey.get(channel) ?? emptyGroup();
       return {
         channel, ...g.stages, pageViews: g.events.VIEW, submitErrors: g.errors,
         clickToSubmit: rate(g.stages.SUBMIT_SUCCESS, g.stages.VIEW),
@@ -154,8 +138,7 @@ export class StatsService {
         select: { id: true, name: true, createdAt: true, _count: { select: { forms: true } }, forms: { select: { _count: { select: { links: true } } } } },
       }),
     ]);
-    return list.map((c) => {
-      const g = byKey.get(c.id) ?? { stages: emptyStages(), events: emptyStages(), errors: 0 };
+    return StatsService.attach(list, byKey, (c) => c.id).map(({ item: c, g }) => {
       return {
         campaignId: c.id, campaignName: c.name, createdAt: c.createdAt,
         formsCount: c._count.forms, linksCount: c.forms.reduce((a, f) => a + f._count.links, 0),
@@ -176,8 +159,7 @@ export class StatsService {
         select: { id: true, channel: true, code: true, createdAt: true, form: { select: { id: true, name: true, slug: true } } },
       }),
     ]);
-    return list.map((l) => {
-      const g = byKey.get(l.id) ?? { stages: emptyStages(), events: emptyStages(), errors: 0 };
+    return StatsService.attach(list, byKey, (l) => l.id).map(({ item: l, g }) => {
       return { linkId: l.id, channel: l.channel, code: l.code, createdAt: l.createdAt, form: l.form, ...g.stages, pageViews: g.events.VIEW, conversionRate: rate(g.stages.SUBMIT_SUCCESS, g.stages.VIEW) };
     });
   }
@@ -194,9 +176,8 @@ export class StatsService {
         select: { id: true, name: true, slug: true, status: true, template: { select: { id: true, name: true } } },
       }),
     ]);
-    return list.map((f) => {
-      const g = byKey.get(f.id) ?? { stages: emptyStages(), events: emptyStages(), errors: 0 };
-      return { formId: f.id, name: f.name, slug: f.slug, status: f.status, template: f.template, stages: this.stageList(g.stages), overallRate: rate(g.stages.SUBMIT_SUCCESS, g.stages.VIEW) };
+    return StatsService.attach(list, byKey, (f) => f.id).map(({ item: f, g }) => {
+      return { formId: f.id, name: f.name, slug: f.slug, status: f.status, template: f.template, stages: stageList(g.stages), overallRate: rate(g.stages.SUBMIT_SUCCESS, g.stages.VIEW) };
     });
   }
 
@@ -245,7 +226,7 @@ export class StatsService {
       this.stageCountsBy(null, s, current),
     ]);
     const r = revisit[0], d = dup[0];
-    const st = stagesMap.get(null)?.stages ?? emptyStages();
+    const st = (stagesMap.get(null) ?? emptyGroup()).stages;
     const once = num(r?.once), multi = num(r?.multi);
     return {
       submittersOnce: once, submittersMulti: multi,
@@ -290,7 +271,7 @@ export class StatsService {
     const { current } = resolvePeriod(q);
     const stage = q.stage ?? 'FORM_START';
     const submitted = q.submitted ?? false;
-    const page = Math.max(1, q.page ?? 1), pageSize = Math.min(100, Math.max(1, q.pageSize ?? 20));
+    const { page, pageSize, skip, take } = normalizePage(q.page, q.pageSize);
     type Row = { visitorId: string; formId: string; first_seen: Date; last_seen: Date; views: bigint; last_channel: Channel | null; last_stage: string; total: bigint };
     const rows = await this.prisma.$queryRaw<Row[]>(Prisma.sql`
       WITH ev AS (${this.ev(s, current)}),
@@ -309,28 +290,19 @@ export class StatsService {
       )
       SELECT "visitorId", "formId", first_seen, last_seen, views, last_channel, last_stage, COUNT(*) OVER() AS total
       FROM agg WHERE reached AND did_submit = ${submitted}
-      ORDER BY last_seen DESC LIMIT ${pageSize} OFFSET ${(page - 1) * pageSize}`);
+      ORDER BY last_seen DESC LIMIT ${take} OFFSET ${skip}`);
     const total = rows.length ? num(rows[0].total) : 0;
     const items = await Promise.all(rows.map(async (r) => ({
       visitorId: r.visitorId, formId: r.formId, firstSeen: r.first_seen, lastSeen: r.last_seen,
       views: num(r.views), lastChannel: r.last_channel, lastStage: r.last_stage,
-      journey: await this.journeyOf(r.formId, r.visitorId),
+      journey: await loadJourney(this.prisma, r.formId, r.visitorId),
     })));
     return { total, page, pageSize, items };
   }
 
-  /** 특정 방문자의 폼 내 이벤트 타임라인 (동시각은 단계 순) */
-  async journeyOf(formId: string, visitorId: string) {
-    const events = await this.prisma.event.findMany({
-      where: { formId, visitorId }, orderBy: { createdAt: 'asc' },
-      select: { id: true, type: true, meta: true, createdAt: true, link: { select: { id: true, channel: true, code: true } } },
-    });
-    return sortJourney(events);
-  }
-
   /** 운영자 전체 합계 (대시보드 상단 카드) — 하위 호환 */
   async overview(operatorId: string) {
-    const g = (await this.stageCountsBy(null, { operatorId }, { from: null, to: null })).get(null) ?? { stages: emptyStages(), events: emptyStages(), errors: 0 };
+    const g = await this.stageGroup({ operatorId }, { from: null, to: null });
     const [submissions, campaigns, forms] = await Promise.all([
       this.prisma.submission.count({ where: { form: { campaign: { operatorId } } } }),
       this.prisma.campaign.count({ where: { operatorId } }),
@@ -341,10 +313,4 @@ export class StatsService {
 
 }
 
-/** 같은 밀리초에 찍힌 이벤트(비콘이 제출 응답 뒤에 도착)는 단계 순서로 정렬 */
-export function sortJourney<T extends { type: keyof typeof EVENT_RANK; createdAt: Date }>(events: T[]): T[] {
-  return [...events].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime() || EVENT_RANK[a.type] - EVENT_RANK[b.type]);
-}
-
 const label = (c: Channel) => CHANNEL_LABELS[c];
-const kstDay = (d: Date) => new Date(d.getTime() + 9 * 3_600_000).toISOString().slice(0, 10);

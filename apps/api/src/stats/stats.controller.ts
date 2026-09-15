@@ -1,7 +1,7 @@
-import { Controller, Get, Query, UseGuards } from '@nestjs/common';
-import { ApiCookieAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { Controller, Get, Query } from '@nestjs/common';
+import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CurrentOperator, OperatorPrincipal } from '../common/current-operator.decorator';
+import { OperatorApi } from '../common/operator-api.decorator';
 import { StatsService } from './stats.service';
 import { StatsQueryDto, VisitorsQueryDto } from './dto/stats-query.dto';
 
@@ -10,8 +10,7 @@ import { StatsQueryDto, VisitorsQueryDto } from './dto/stats-query.dto';
  * 단계 수는 고유 방문자(gu_vid) 기준. 정의는 ADR-0007.
  */
 @ApiTags('stats')
-@ApiCookieAuth('gu_admin')
-@UseGuards(JwtAuthGuard)
+@OperatorApi()
 @Controller('stats')
 export class StatsController {
   constructor(private readonly stats: StatsService) {}
