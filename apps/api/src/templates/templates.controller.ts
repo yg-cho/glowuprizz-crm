@@ -1,20 +1,19 @@
 import {
   Body, Controller, Delete, Get, HttpCode, Param, ParseUUIDPipe, Post,
-  UploadedFile, UseGuards, UseInterceptors,
+  UploadedFile, UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { ApiBody, ApiConsumes, ApiCookieAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiBody, ApiConsumes, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { memoryStorage } from 'multer';
 import { MAX_HTML_BYTES } from '@glowuprizz/shared';
-import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentOperator, OperatorPrincipal } from '../common/current-operator.decorator';
+import { OperatorApi } from '../common/operator-api.decorator';
 import { TemplatesService } from './templates.service';
 import { CreateTemplateDto } from './dto/create-template.dto';
 import { validateHtmlUpload } from './html-validator';
 
 @ApiTags('templates')
-@ApiCookieAuth('gu_admin')
-@UseGuards(JwtAuthGuard)
+@OperatorApi()
 @Controller('templates')
 export class TemplatesController {
   constructor(private readonly templates: TemplatesService) {}

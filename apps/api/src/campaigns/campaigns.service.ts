@@ -1,10 +1,11 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { OwnershipService } from '../common/ownership.service';
 import { CreateCampaignDto } from './dto/create-campaign.dto';
 
 @Injectable()
 export class CampaignsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService, private readonly own: OwnershipService) {}
 
   create(operatorId: string, dto: CreateCampaignDto) {
     return this.prisma.campaign.create({ data: { operatorId, ...dto } });
@@ -19,16 +20,15 @@ export class CampaignsService {
   }
 
   async get(operatorId: string, id: string) {
-    const c = await this.prisma.campaign.findFirst({
-      where: { id, operatorId },
+    await this.own.campaign(operatorId, id);
+    return this.prisma.campaign.findUniqueOrThrow({
+      where: { id },
       include: { forms: { include: { template: { select: { id: true, name: true } }, _count: { select: { links: true, submissions: true } } } } },
     });
-    if (!c) throw new NotFoundException('campaign not found');
-    return c;
   }
 
   async remove(operatorId: string, id: string) {
-    await this.get(operatorId, id);
+    await this.own.campaign(operatorId, id);
     await this.prisma.campaign.delete({ where: { id } });
   }
 }

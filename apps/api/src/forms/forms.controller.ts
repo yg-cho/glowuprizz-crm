@@ -1,14 +1,13 @@
-import { Body, Controller, Delete, Get, HttpCode, Param, ParseUUIDPipe, Patch, Post, Query, UseGuards } from '@nestjs/common';
-import { ApiCookieAuth, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { Body, Controller, Delete, Get, HttpCode, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
+import { ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { CurrentOperator, OperatorPrincipal } from '../common/current-operator.decorator';
+import { OperatorApi } from '../common/operator-api.decorator';
 import { FormsService } from './forms.service';
 import { CreateFormDto } from './dto/create-form.dto';
 import { UpdateFormDto } from './dto/update-form.dto';
 
 @ApiTags('forms')
-@ApiCookieAuth('gu_admin')
-@UseGuards(JwtAuthGuard)
+@OperatorApi()
 @Controller('forms')
 export class FormsController {
   constructor(private readonly forms: FormsService) {}

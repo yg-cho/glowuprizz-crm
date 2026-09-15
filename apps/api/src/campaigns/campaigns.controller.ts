@@ -1,13 +1,12 @@
-import { Body, Controller, Delete, Get, HttpCode, Param, ParseUUIDPipe, Post, UseGuards } from '@nestjs/common';
-import { ApiCookieAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { Body, Controller, Delete, Get, HttpCode, Param, ParseUUIDPipe, Post } from '@nestjs/common';
+import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CurrentOperator, OperatorPrincipal } from '../common/current-operator.decorator';
+import { OperatorApi } from '../common/operator-api.decorator';
 import { CampaignsService } from './campaigns.service';
 import { CreateCampaignDto } from './dto/create-campaign.dto';
 
 @ApiTags('campaigns')
-@ApiCookieAuth('gu_admin')
-@UseGuards(JwtAuthGuard)
+@OperatorApi()
 @Controller('campaigns')
 export class CampaignsController {
   constructor(private readonly campaigns: CampaignsService) {}
