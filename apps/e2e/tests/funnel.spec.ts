@@ -104,6 +104,69 @@ test.describe('브라우저 퍼널', () => {
   });
 });
 
+test.describe('퍼널 화면', () => {
+  test('방문자 여정이 대시보드·캠페인 상세·CRM 명단에 단계별로 보인다', async ({ page, browser }) => {
+    const tag = Date.now().toString(36);
+    const { camp, form, link } = await prepareViaApi(tag);
+
+    // 방문자 A: 완주 (같은 컨텍스트에서 재방문 1회)
+    const a = await browser.newContext(); const pa = await a.newPage();
+    await pa.goto(link.url); await pa.waitForTimeout(300);
+    await pa.goto(link.url);
+    await pa.fill('#name', '완주자'); await pa.fill('#phone', '01000000001'); await pa.check('#agree');
+    const done = pa.waitForResponse((r) => r.url().includes('/submissions') && r.request().method() === 'POST');
+    await pa.click('button[type=submit]'); await done;
+    await pa.waitForTimeout(400); await a.close();
+
+    // 방문자 B: 작성 시작 후 이탈 (미신청)
+    const b = await browser.newContext(); const pb = await b.newPage();
+    await pb.goto(link.url); await pb.fill('#name', '이탈자'); await pb.waitForTimeout(400); await b.close();
+
+    // 방문자 C: 클릭만 (봇처럼) — JS 비활성
+    const c = await browser.newContext({ javaScriptEnabled: false }); const pc = await c.newPage();
+    await pc.goto(link.url); await c.close();
+
+    // 운영자 로그인
+    await page.goto(`${WEB}/login`); await page.fill('#email', EMAIL); await page.fill('#password', PASSWORD); await page.click('button[type=submit]');
+    await expect(page).toHaveURL(/\/(\?.*)?$/);
+
+    // 대시보드: 이 캠페인만, 전 기간
+    await page.goto(`${WEB}/?range=all&campaignId=${camp.id}`);
+    const card = (stage: string) => page.getByTestId('stage-card').and(page.locator(`[data-stage=${stage}]`)).locator('.text-2xl');
+    await expect(card('VIEW')).toHaveText('3');            // A B C
+    await expect(card('FORM_VIEW')).toHaveText('2');       // C 제외 (JS 없음)
+    await expect(card('FORM_START')).toHaveText('2');      // A B
+    await expect(card('SUBMIT_ATTEMPT')).toHaveText('1');
+    await expect(card('SUBMIT_SUCCESS')).toHaveText('1');
+    await expect(page.getByTestId('stage-card').getByText('최대 이탈 구간')).toBeVisible();
+    await expect(page.getByRole('heading', { name: '채널 비교' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: '일별 추이' })).toBeVisible();
+
+    // 캠페인 상세
+    await page.goto(`${WEB}/campaigns/${camp.id}?range=all`);
+    for (const h of ['링크별 성과', '폼 비교', '시간대별 클릭', '제출 실패', '방문자 품질', '폼 관리']) await expect(page.getByRole('heading', { name: h })).toBeVisible();
+    await expect(page.locator('table').first()).toContainText(`/l/${link.code}`);
+    await expect(page.getByText('봇 의심')).toBeVisible();
+
+    // CRM 명단: 신청 완료 여정 펼침
+    await page.goto(`${WEB}/submissions?range=all&campaignId=${camp.id}`);
+    await page.locator('tbody tr').filter({ hasText: '완주자' }).first().click();
+    const journey = page.getByRole('list').filter({ hasText: '신청 완료' });
+    await expect(journey).toContainText('링크 클릭');
+    await expect(journey).toContainText('재방문');
+    await expect(journey).toContainText('작성 시작');
+    await expect(journey).toContainText('제출 시도');
+    await expect(page.getByText(/방문 2회/)).toBeVisible();
+
+    // 미신청 탭: 이탈자
+    await page.getByRole('tab', { name: '작성만 하고 미신청' }).click();
+    await expect(page.getByText('총 1명')).toBeVisible();
+    await expect(page.getByText('제출 시도 없음')).toBeVisible();
+    await expect(page.getByText(/name 입력 후 멈춤/)).toBeVisible();
+    void form;
+  });
+});
+
 test.describe('격리: 등록 HTML 은 관리자 인증정보/API 에 접근 불가', () => {
   test('악성 HTML 이 관리자 API 호출·쿠키 접근·외부 유출을 시도해도 모두 차단', async ({ browser }) => {
     const tag = Date.now().toString(36);

@@ -12,7 +12,7 @@ export function StageCards({ funnel, previous }: { funnel: FunnelSnapshot; previ
         const delta = prev && prev.visitors > 0 ? (s.visitors - prev.visitors) / prev.visitors : null;
         const isMaxDrop = funnel.maxDropStage === s.type;
         return (
-          <Card key={s.type} className="relative">
+          <Card key={s.type} className="relative" data-testid="stage-card" data-stage={s.type}>
             <CardContent className="p-4">
               <div className="text-xs text-muted-foreground">{s.label}{i === 0 && ' · 방문자'}</div>
               <div className="mt-1 text-2xl font-semibold tabular-nums tracking-tight">{fmtNum(s.visitors)}</div>
