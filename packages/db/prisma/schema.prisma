@@ -1,0 +1,137 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// 인증된 운영자. 관리자 기능과 신청자 데이터 접근 주체.
+model Operator {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
+
+  templates HtmlTemplate[]
+  campaigns Campaign[]
+
+  @@map("operators")
+}
+
+/// 운영자가 AI로 만들어 등록한 단일 .html 파일. 원문 그대로 보관.
+model HtmlTemplate {
+  id         String   @id @default(uuid())
+  operatorId String
+  name       String
+  html       String
+  sizeBytes  Int
+  createdAt  DateTime @default(now())
+
+  operator Operator @relation(fields: [operatorId], references: [id], onDelete: Cascade)
+  forms    Form[]
+
+  @@index([operatorId])
+  @@map("html_templates")
+}
+
+/// 캠페인. 성과 집계의 최상위 단위.
+model Campaign {
+  id          String   @id @default(uuid())
+  operatorId  String
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+
+  operator Operator @relation(fields: [operatorId], references: [id], onDelete: Cascade)
+  forms    Form[]
+
+  @@index([operatorId])
+  @@map("campaigns")
+}
+
+enum FormStatus {
+  ACTIVE
+  PAUSED
+}
+
+/// 캠페인 + HTML 템플릿 조합으로 만든 커스텀 신청 폼. 공개 URL 단위.
+model Form {
+  id         String     @id @default(uuid())
+  campaignId String
+  templateId String
+  name       String
+  slug       String     @unique
+  status     FormStatus @default(ACTIVE)
+  createdAt  DateTime   @default(now())
+
+  campaign    Campaign           @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  template    HtmlTemplate       @relation(fields: [templateId], references: [id], onDelete: Restrict)
+  links       DistributionLink[]
+  visits      Visit[]
+  submissions Submission[]
+
+  @@index([campaignId])
+  @@map("forms")
+}
+
+enum Channel {
+  INSTAGRAM
+  X
+  YOUTUBE
+  THREADS
+}
+
+/// 채널별 배포 링크. /l/{code} 로 접근. 코드만 노출되어 채널 조작 불가.
+model DistributionLink {
+  id        String   @id @default(uuid())
+  formId    String
+  channel   Channel
+  code      String   @unique
+  createdAt DateTime @default(now())
+
+  form        Form         @relation(fields: [formId], references: [id], onDelete: Cascade)
+  visits      Visit[]
+  submissions Submission[]
+
+  @@index([formId])
+  @@map("distribution_links")
+}
+
+/// 페이지뷰 1건. visitorId 는 익명 쿠키.
+model Visit {
+  id        String   @id @default(uuid())
+  formId    String
+  linkId    String?
+  visitorId String
+  ipHash    String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  form Form              @relation(fields: [formId], references: [id], onDelete: Cascade)
+  link DistributionLink? @relation(fields: [linkId], references: [id], onDelete: SetNull)
+
+  @@index([formId, createdAt])
+  @@index([linkId])
+  @@index([formId, visitorId])
+  @@map("visits")
+}
+
+/// 신청 1건 = CRM 명단 행. payload 는 폼 필드 전체 (name/value).
+model Submission {
+  id        String   @id @default(uuid())
+  formId    String
+  linkId    String?
+  visitorId String?
+  payload   Json
+  ipHash    String?
+  createdAt DateTime @default(now())
+
+  form Form              @relation(fields: [formId], references: [id], onDelete: Cascade)
+  link DistributionLink? @relation(fields: [linkId], references: [id], onDelete: SetNull)
+
+  @@index([formId, createdAt])
+  @@index([linkId])
+  @@map("submissions")
+}
