@@ -22,7 +22,7 @@ function SubmissionsView() {
     <>
       <PageTitle title="CRM 명단" desc="신청자 한 명이 어느 채널로 몇 번 들어와 언제 썼는지. '작성만 하고 미신청'은 리마케팅 후보(방문자 쿠키 기준)." />
       <FiltersBar
-        filters={filters} onChange={set} campaigns={campaigns ?? []}
+        filters={filters} onChange={set} campaigns={campaigns ?? []} hideRange={mode === 'submitted'}
         right={
           <Tabs value={mode} onValueChange={(v) => setMode(v as Mode)}>
             <TabsList aria-label="상태"><TabsTrigger value="submitted">신청 완료</TabsTrigger><TabsTrigger value="abandoned">작성만 하고 미신청</TabsTrigger></TabsList>
@@ -32,7 +32,7 @@ function SubmissionsView() {
       <Card>
         <CardContent className="p-5">
           {mode === 'submitted'
-            ? <SubmittedList key={`${filters.campaignId}-${filters.channel}`} campaignId={filters.campaignId} channel={filters.channel} />
+            ? <SubmittedList key={`${filters.campaignId}-${filters.formId}-${filters.channel}`} campaignId={filters.campaignId} formId={filters.formId} channel={filters.channel} />
             : <AbandonedList key={query()} statsQuery={query()} />}
         </CardContent>
       </Card>

@@ -24,6 +24,7 @@ export function useApi<T>(path: string | null): ApiState<T> {
   useEffect(() => {
     if (!path) { setData(null); setLoading(false); return; }
     const mine = ++seq.current;
+    setData(null); // 이전 필터의 수치가 새 라벨 아래 남지 않도록
     setLoading(true); setError(null);
     api.get<T>(path)
       .then((d) => { if (mine === seq.current) setData(d); })
@@ -42,8 +43,8 @@ export function useAction<A extends unknown[]>(fn: (...args: A) => Promise<void>
   const run = useCallback(async (...args: A) => {
     setBusy(true); setError(null);
     try { await fn(...args); }
-    catch (e) { setError(e instanceof ApiError ? e.message : fallback); }
+    catch (e) { setError(e instanceof Error && e.message ? e.message : fallback); }
     finally { setBusy(false); }
   }, [fn, fallback]);
-  return { run, busy, error, clearError: () => setError(null) };
+  return { run, busy, error };
 }

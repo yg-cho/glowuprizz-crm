@@ -142,6 +142,15 @@ test.describe('퍼널 화면', () => {
     await expect(page.getByRole('heading', { name: '채널 비교' })).toBeVisible();
     await expect(page.getByRole('heading', { name: '일별 추이' })).toBeVisible();
 
+    // 비교 필터를 끄면 URL 에 compare=0 이 남고 기본값(비교)으로 되돌아가지 않는다
+    await page.goto(`${WEB}/?range=7d&campaignId=${camp.id}`);
+    await page.getByRole('combobox', { name: '비교' }).click();
+    await page.getByRole('option', { name: '비교 없음' }).click();
+    await expect(page).toHaveURL(/compare=0/);
+    await expect(page.getByRole('combobox', { name: '비교' })).toHaveText('비교 없음');
+    await page.reload();
+    await expect(page.getByRole('combobox', { name: '비교' })).toHaveText('비교 없음');
+
     // 캠페인 상세
     await page.goto(`${WEB}/campaigns/${camp.id}?range=all`);
     for (const h of ['링크별 성과', '폼 비교', '시간대별 클릭', '제출 실패', '방문자 품질', '폼 관리']) await expect(page.getByRole('heading', { name: h })).toBeVisible();

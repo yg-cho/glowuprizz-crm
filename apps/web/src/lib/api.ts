@@ -8,7 +8,7 @@ export class ApiError extends Error {
 
 async function handle<T>(res: Response): Promise<T> {
   if (res.status === 401 && typeof window !== 'undefined' && !location.pathname.startsWith('/login')) {
-    location.href = `/login?next=${encodeURIComponent(location.pathname)}`;
+    location.href = `/login?next=${encodeURIComponent(location.pathname + location.search)}`;
   }
   if (!res.ok) {
     let msg = res.statusText;
@@ -53,7 +53,7 @@ export interface Campaign { id: string; name: string; description?: string | nul
 export interface FormRow {
   id: string; name: string; slug: string; status: 'ACTIVE' | 'PAUSED'; createdAt: string;
   campaign?: { id: string; name: string }; template?: { id: string; name: string };
-  _count?: { links: number; submissions: number }; links?: Link[];
+  _count?: { links: number; submissions: number }; links?: Omit<Link, 'url'>[];
 }
 export interface Link { id: string; formId: string; channel: Channel; code: string; url: string; createdAt: string }
 export interface Submission {

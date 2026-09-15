@@ -24,16 +24,16 @@ export default function FormDetailPage() {
   const router = useRouter();
   const form = useApi<FormRow>(`/forms/${id}`);
   const links = useApi<LinkStats[]>(`/stats/links?range=all&formId=${id}`);
-  const publicOrigin = usePublicOrigin(id);
+  const publicOrigin = usePublicOrigin();
   const [channel, setChannel] = useState<Channel>('INSTAGRAM');
 
   const createLink = useAction(async () => { await api.post('/links', { formId: id, channel }); links.reload(); form.reload(); }, '링크를 만들지 못했습니다.');
   const removeLink = async (l: LinkStats) => { await api.del(`/links/${l.linkId}`); links.reload(); form.reload(); };
-  const toggle = async () => {
+  const toggle = useAction(async () => {
     if (!form.data) return;
     await api.patch(`/forms/${id}`, { status: form.data.status === 'ACTIVE' ? 'PAUSED' : 'ACTIVE' });
     form.reload();
-  };
+  }, '상태를 바꾸지 못했습니다.');
   const removeForm = async () => { await api.del(`/forms/${id}`); router.push(form.data?.campaign ? `/campaigns/${form.data.campaign.id}` : '/campaigns'); };
 
   const f = form.data;
@@ -46,12 +46,13 @@ export default function FormDetailPage() {
         right={f && (
           <div className="flex items-center gap-2">
             <StatusBadge status={f.status} />
-            <Button size="sm" variant="outline" onClick={toggle}>{f.status === 'ACTIVE' ? <><Pause /> 일시중지</> : <><Play /> 재개</>}</Button>
+            <Button size="sm" variant="outline" onClick={() => toggle.run()} disabled={toggle.busy}>{f.status === 'ACTIVE' ? <><Pause /> 일시중지</> : <><Play /> 재개</>}</Button>
             <ConfirmButton size="icon-sm" variant="destructive" aria-label="폼 삭제" title="폼을 삭제할까요?" description="링크·이벤트·신청 데이터가 함께 삭제됩니다." onConfirm={removeForm}><Trash2 /></ConfirmButton>
           </div>
         )}
       />
 
+      <ErrorText>{form.error ?? toggle.error}</ErrorText>
       <div className="grid gap-3 lg:grid-cols-3">
         <Section title="배포 링크 만들기" desc="채널별 고유 URL. 채널명은 URL에 노출되지 않습니다.">
           <form onSubmit={(e) => { e.preventDefault(); createLink.run(); }} className="flex flex-col gap-3">
@@ -67,8 +68,8 @@ export default function FormDetailPage() {
           </form>
         </Section>
 
-        <Section title="배포 링크" desc="전 기간 단계 수. 복사해서 각 채널에 게시." className="lg:col-span-2">
-          <LinkTable rows={links.data ?? []} publicOrigin={publicOrigin} onDelete={removeLink} />
+        <Section title="배포 링크" desc="전 기간 단계 수. 복사해서 각 채널에 게시." className="lg:col-span-2" state={links}>
+          <LinkTable rows={links.data} publicOrigin={publicOrigin} onDelete={removeLink} />
         </Section>
 
         <Section title="신청 명단" desc="이 폼으로 들어온 신청. 행을 펼치면 방문자 여정." className="lg:col-span-3">

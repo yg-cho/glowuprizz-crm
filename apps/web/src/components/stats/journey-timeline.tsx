@@ -1,8 +1,7 @@
 import { CHANNEL_LABELS, EVENT_LABELS as LABEL, STAGES as ORDER, type Channel, type Stage } from '@glowuprizz/shared';
 import { cn } from '@/lib/utils';
-import { fmtDayTime, fmtTime } from '@/lib/format';
+import { failureShort, fmtDayTime, fmtTime } from '@/lib/format';
 import type { JourneyEvent } from '@/lib/api';
-const REASON: Record<string, string> = { network: '네트워크', http: '서버 응답' };
 
 
 /**
@@ -10,35 +9,37 @@ const REASON: Record<string, string> = { network: '네트워크', http: '서버 
  */
 export function JourneyTimeline({ events }: { events: JourneyEvent[] }) {
   if (events.length === 0) return <p className="text-xs text-muted-foreground">방문자 쿠키 없이 제출되어 여정이 없습니다.</p>;
-  type Item = { key: string; label: string; sub: string; kind: 'done' | 'miss' | 'error' | 'success' };
+  type Item = { key: string; type: JourneyEvent['type'] | 'MISS'; label: string; sub: string; kind: 'done' | 'miss' | 'error' | 'success' };
   const items: Item[] = [];
   let views = 0;
   let prevDay = '';
+  let hadError = false;
   for (const e of events) {
-    const day = e.createdAt.slice(0, 10);
+    const day = new Date(e.createdAt).toLocaleDateString('ko-KR'); // 표시와 같은 기준(로컬)으로 날짜 전환 판단
     const t = day !== prevDay ? fmtDayTime(e.createdAt) : fmtTime(e.createdAt);
     prevDay = day;
     if (e.type === 'VIEW') {
       views += 1;
       // 이전 방문에서 작성 없이 끝났으면 '이탈' 표시
       const last = items[items.length - 1];
-      if (views > 1 && last && (last.label === '폼 도달' || last.label === '링크 클릭')) items.push({ key: `miss${views}`, label: '이탈', sub: '작성 없이 닫음', kind: 'miss' });
-      items.push({ key: e.id, label: views === 1 ? '링크 클릭' : '재방문', sub: t + (e.link ? ` · ${CHANNEL_LABELS[e.link.channel as Channel]}` : ''), kind: 'done' });
+      if (views > 1 && last && (last.type === 'FORM_VIEW' || last.type === 'VIEW')) items.push({ key: `miss${views}`, type: 'MISS', label: '이탈', sub: '작성 없이 닫음', kind: 'miss' });
+      items.push({ key: e.id, type: 'VIEW', label: views === 1 ? '링크 클릭' : '재방문', sub: t + (e.link ? ` · ${CHANNEL_LABELS[e.link.channel as Channel]}` : ''), kind: 'done' });
     } else if (e.type === 'SUBMIT_ERROR') {
-      const m = (e.meta ?? {}) as { reason?: string; status?: number };
-      items.push({ key: e.id, label: '제출 실패', sub: `${t} · ${REASON[m.reason ?? ''] ?? m.reason ?? ''}${m.status ? ` ${m.status}` : ''}`, kind: 'error' });
-    } else if (e.type === 'SUBMIT_ATTEMPT' && items.some((i) => i.label === '제출 실패')) {
-      items.push({ key: e.id, label: '재시도', sub: t, kind: 'done' });
+      const m = (e.meta ?? {}) as { reason?: string; status?: number | null };
+      hadError = true;
+      items.push({ key: e.id, type: 'SUBMIT_ERROR', label: '제출 실패', sub: `${t} · ${failureShort(m.reason ?? 'unknown')}${typeof m.status === 'number' ? ` ${m.status}` : ''}`, kind: 'error' });
+    } else if (e.type === 'SUBMIT_ATTEMPT' && hadError) {
+      items.push({ key: e.id, type: 'SUBMIT_ATTEMPT', label: '재시도', sub: t, kind: 'done' });
     } else {
       const m = (e.meta ?? {}) as { field?: string };
-      items.push({ key: e.id, label: LABEL[e.type], sub: t + (e.type === 'FORM_START' && m.field ? ` · ${m.field}` : ''), kind: e.type === 'SUBMIT_SUCCESS' ? 'success' : 'done' });
+      items.push({ key: e.id, type: e.type, label: LABEL[e.type], sub: t + (e.type === 'FORM_START' && m.field ? ` · ${m.field}` : ''), kind: e.type === 'SUBMIT_SUCCESS' ? 'success' : 'done' });
     }
   }
   // 도달 못 한 단계
   const reached = new Set(events.map((e) => e.type));
   const lastIdx = ORDER.reduce((acc, s, i) => (reached.has(s) ? i : acc), -1);
   const next = ORDER[lastIdx + 1];
-  if (next && !reached.has('SUBMIT_SUCCESS')) items.push({ key: 'next', label: `${LABEL[next]} 없음`, sub: hintFor(next, events), kind: 'miss' });
+  if (next && !reached.has('SUBMIT_SUCCESS')) items.push({ key: 'next', type: 'MISS', label: `${LABEL[next]} 없음`, sub: hintFor(next, events), kind: 'miss' });
 
   return (
     <ol className="flex overflow-x-auto">

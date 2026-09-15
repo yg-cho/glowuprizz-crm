@@ -10,7 +10,7 @@ const target = () =>
 
 // hop-by-hop / 재계산되는 헤더는 전달하지 않음
 const STRIP_REQ = new Set(['host', 'connection', 'content-length', 'accept-encoding']);
-const STRIP_RES = new Set(['content-encoding', 'content-length', 'transfer-encoding', 'connection']);
+const STRIP_RES = new Set(['content-encoding', 'content-length', 'transfer-encoding', 'connection', 'location']);
 
 async function proxy(req: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {
   const { path } = await params;
@@ -22,13 +22,20 @@ async function proxy(req: NextRequest, { params }: { params: Promise<{ path: str
 
   // 바디는 버퍼로 전달 (multipart 포함). 업로드 상한이 512KB 라 메모리 부담 없음.
   const hasBody = !['GET', 'HEAD'].includes(req.method);
-  const upstream = await fetch(url, {
-    method: req.method,
-    headers,
-    body: hasBody ? Buffer.from(await req.arrayBuffer()) : undefined,
-    redirect: 'manual',
-    cache: 'no-store',
-  });
+  let upstream: Response;
+  try {
+    upstream = await fetch(url, {
+      method: req.method,
+      headers,
+      body: hasBody ? Buffer.from(await req.arrayBuffer()) : undefined,
+      redirect: 'manual',
+      cache: 'no-store',
+    });
+  } catch (e) {
+    // 업스트림 연결 실패는 클라이언트가 파싱할 수 있는 JSON 으로
+    console.error('api proxy upstream error', e);
+    return Response.json({ statusCode: 502, message: '관리자 API 에 연결할 수 없습니다.', error: 'Bad Gateway' }, { status: 502 });
+  }
 
   const resHeaders = new Headers();
   upstream.headers.forEach((v, k) => { if (!STRIP_RES.has(k.toLowerCase())) resHeaders.append(k, v); });
