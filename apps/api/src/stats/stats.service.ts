@@ -1,18 +1,10 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@glowuprizz/db';
-import { CHANNELS, Channel } from '@glowuprizz/shared';
+import { CHANNELS, CHANNEL_LABELS, Channel, EVENT_RANK, STAGES, STAGE_LABELS, Stage, StageCounts } from '@glowuprizz/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { StatsQueryDto, VisitorsQueryDto } from './dto/stats-query.dto';
 import { Period, resolvePeriod } from './period';
 
-/** 퍼널 단계 순서. 이벤트 type 과 1:1. */
-export const STAGES = ['VIEW', 'FORM_VIEW', 'FORM_START', 'SUBMIT_ATTEMPT', 'SUBMIT_SUCCESS'] as const;
-export type Stage = (typeof STAGES)[number];
-export const STAGE_LABELS: Record<Stage, string> = {
-  VIEW: '링크 클릭', FORM_VIEW: '폼 도달', FORM_START: '작성 시작', SUBMIT_ATTEMPT: '제출 시도', SUBMIT_SUCCESS: '신청 완료',
-};
-
-type StageCounts = Record<Stage, number>;
 const emptyStages = (): StageCounts => ({ VIEW: 0, FORM_VIEW: 0, FORM_START: 0, SUBMIT_ATTEMPT: 0, SUBMIT_SUCCESS: 0 });
 const rate = (n: number, d: number) => (d === 0 ? 0 : Math.round((n / d) * 10000) / 10000);
 const num = (v: unknown) => Number(v ?? 0);
@@ -350,10 +342,9 @@ export class StatsService {
 }
 
 /** 같은 밀리초에 찍힌 이벤트(비콘이 제출 응답 뒤에 도착)는 단계 순서로 정렬 */
-const EVENT_RANK: Record<string, number> = { VIEW: 0, FORM_VIEW: 1, FORM_START: 2, SUBMIT_ATTEMPT: 3, SUBMIT_ERROR: 4, SUBMIT_SUCCESS: 5 };
-export function sortJourney<T extends { type: string; createdAt: Date }>(events: T[]): T[] {
+export function sortJourney<T extends { type: keyof typeof EVENT_RANK; createdAt: Date }>(events: T[]): T[] {
   return [...events].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime() || EVENT_RANK[a.type] - EVENT_RANK[b.type]);
 }
 
-const label = (c: Channel) => ({ INSTAGRAM: '인스타그램', X: 'X', YOUTUBE: '유튜브', THREADS: '스레드' })[c];
+const label = (c: Channel) => CHANNEL_LABELS[c];
 const kstDay = (d: Date) => new Date(d.getTime() + 9 * 3_600_000).toISOString().slice(0, 10);

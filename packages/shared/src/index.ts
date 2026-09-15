@@ -1,3 +1,6 @@
+// 이 패키지는 빌드 없이 TS 소스로 참조된다(Node 22 type stripping, Next transpilePackages). 단일 파일 유지 — 상대 import 금지.
+
+// ---------------------------------------------------------------- 채널
 export const CHANNELS = ['INSTAGRAM', 'X', 'YOUTUBE', 'THREADS'] as const;
 export type Channel = (typeof CHANNELS)[number];
 
@@ -7,37 +10,71 @@ export const CHANNEL_LABELS: Record<Channel, string> = {
   YOUTUBE: '유튜브',
   THREADS: '스레드',
 };
+/** 셀렉트 박스용 */
+export const CHANNEL_OPTIONS = CHANNELS.map((value) => ({ value, label: CHANNEL_LABELS[value] }));
 
+// ---------------------------------------------------------------- 퍼널 이벤트 / 단계 (ADR-0007)
+/** DB enum EventType 과 1:1 */
+export const EVENT_TYPES = ['VIEW', 'FORM_VIEW', 'FORM_START', 'SUBMIT_ATTEMPT', 'SUBMIT_ERROR', 'SUBMIT_SUCCESS'] as const;
+export type EventType = (typeof EVENT_TYPES)[number];
+
+/** 퍼널 단계 순서 (SUBMIT_ERROR 는 단계가 아님) */
+export const STAGES = ['VIEW', 'FORM_VIEW', 'FORM_START', 'SUBMIT_ATTEMPT', 'SUBMIT_SUCCESS'] as const;
+export type Stage = (typeof STAGES)[number];
+
+export const STAGE_LABELS: Record<Stage, string> = {
+  VIEW: '링크 클릭',
+  FORM_VIEW: '폼 도달',
+  FORM_START: '작성 시작',
+  SUBMIT_ATTEMPT: '제출 시도',
+  SUBMIT_SUCCESS: '신청 완료',
+};
+export const EVENT_LABELS: Record<EventType, string> = { ...STAGE_LABELS, SUBMIT_ERROR: '제출 실패' };
+
+/** 동시각 이벤트 정렬용 순위 (비콘이 제출 응답 뒤에 도착할 수 있음) */
+export const EVENT_RANK: Record<EventType, number> = { VIEW: 0, FORM_VIEW: 1, FORM_START: 2, SUBMIT_ATTEMPT: 3, SUBMIT_ERROR: 4, SUBMIT_SUCCESS: 5 };
+
+/** 브라우저(주입 스크립트)가 보낼 수 있는 이벤트. VIEW·SUBMIT_SUCCESS 는 서버 전용. */
+export const CLIENT_EVENT_TYPES = ['form_view', 'form_start', 'submit_attempt', 'submit_error'] as const;
+export type ClientEventType = (typeof CLIENT_EVENT_TYPES)[number];
+export const CLIENT_EVENT_MAP: Record<ClientEventType, EventType> = {
+  form_view: 'FORM_VIEW',
+  form_start: 'FORM_START',
+  submit_attempt: 'SUBMIT_ATTEMPT',
+  submit_error: 'SUBMIT_ERROR',
+};
+
+export type StageCounts = Record<Stage, number>;
+export interface FunnelStage {
+  type: Stage;
+  label: string;
+  visitors: number;
+  /** 직전 단계 대비 */
+  stepRate: number;
+  /** 첫 단계 대비 */
+  cumulativeRate: number;
+  dropoff: number;
+}
+
+// ---------------------------------------------------------------- 쿠키 / 업로드
 export const VISITOR_COOKIE = 'gu_vid';
 export const AUTH_COOKIE = 'gu_admin';
+/** gu_vid 값 형식 (UUID v4) */
+export const VISITOR_ID_PATTERN = /^[0-9a-f-]{36}$/;
 
 /** 업로드 HTML 최대 크기 (bytes) */
 export const MAX_HTML_BYTES = 512 * 1024;
 
-export interface CampaignStats {
-  campaignId: string;
-  campaignName: string;
-  visits: number;
-  visitors: number;
-  submissions: number;
-  /** submissions / visitors, 0~1. visitors 0이면 0 */
-  conversionRate: number;
-}
-
-export interface ChannelStats {
-  channel: Channel;
-  visits: number;
-  visitors: number;
-  submissions: number;
-  conversionRate: number;
-}
-
 /**
  * 요청이 HTTPS 로 들어왔는지 (리버스 프록시 뒤 포함). Secure 쿠키 플래그 결정에 사용.
- * (이 패키지는 빌드 없이 TS 소스로 참조되므로 단일 파일 유지 — 상대 import 금지)
  */
 export function isSecureRequest(req: { secure?: boolean; headers: Record<string, unknown> }): boolean {
   if (req.secure) return true;
   const proto = req.headers['x-forwarded-proto'];
   return typeof proto === 'string' && proto.split(',')[0].trim() === 'https';
+}
+
+/** httpOnly 쿠키 공통 옵션. Secure 는 요청 프로토콜 기준 (http 로컬/compose 에서도 쿠키 유지). */
+export function httpOnlyCookie(req: { secure?: boolean; headers: Record<string, unknown> }, maxAgeMs: number) {
+  return { httpOnly: true, sameSite: 'lax' as const, secure: isSecureRequest(req), maxAge: maxAgeMs, path: '/' };
 }
