@@ -1,3 +1,4 @@
+import { Fragment } from 'react';
 import type { Heatmap as HeatmapData } from '@/lib/api';
 
 const DOW = ['일', '월', '화', '수', '목', '금', '토'];
@@ -12,10 +13,10 @@ export function Heatmap({ data }: { data: HeatmapData }) {
         <span />
         {Array.from({ length: 24 }, (_, h) => <span key={h} className="text-center">{h % 3 === 0 ? h : ''}</span>)}
         {data.grid.map((row, d) => (
-          <>
-            <span key={`l${d}`} className="leading-3">{DOW[d]}</span>
-            {row.map((v, h) => <i key={`${d}-${h}`} title={`${DOW[d]} ${h}시 · ${v}`} className={`block h-3 rounded-[2px] ${shade(v)}`} />)}
-          </>
+          <Fragment key={d}>
+            <span className="leading-3">{DOW[d]}</span>
+            {row.map((v, h) => <i key={h} title={`${DOW[d]} ${h}시 · ${v}`} className={`block h-3 rounded-[2px] ${shade(v)}`} />)}
+          </Fragment>
         ))}
       </div>
       <div className="mt-2 text-xs text-muted-foreground">최대 {data.max}회 · 진할수록 많음</div>

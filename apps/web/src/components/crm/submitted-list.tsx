@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import type { Channel } from '@glowuprizz/shared';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { EmptyRow } from '@/components/empty-row';
 import { ChannelBadge } from '@/components/channel-badge';
 import { JourneyTimeline } from '@/components/stats/journey-timeline';
 import { Pager } from './pager';
@@ -25,7 +26,7 @@ interface Props {
 export function SubmittedList({ campaignId, formId, channel, pageSize = 20, compact }: Props) {
   const [page, setPage] = useState(1);
   const [open, setOpen] = useState<string | null>(null);
-  const [journeys, setJourneys] = useState<Record<string, Journey>>({});
+  const [journeys, setJourneys] = useState<Record<string, Journey | { error: string }>>({});
 
   const q = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
   if (campaignId) q.set('campaignId', campaignId);
@@ -36,7 +37,11 @@ export function SubmittedList({ campaignId, formId, channel, pageSize = 20, comp
   const toggle = (s: Submission) => {
     if (open === s.id) return setOpen(null);
     setOpen(s.id);
-    if (!journeys[s.id]) api.get<Journey>(`/submissions/${s.id}/journey`).then((j) => setJourneys((prev) => ({ ...prev, [s.id]: j })));
+    if (!journeys[s.id]) {
+      api.get<Journey>(`/submissions/${s.id}/journey`)
+        .then((j) => setJourneys((prev) => ({ ...prev, [s.id]: j })))
+        .catch(() => setJourneys((prev) => ({ ...prev, [s.id]: { error: '여정을 불러오지 못했습니다.' } })));
+    }
   };
 
   const items = data?.items ?? [];
@@ -49,11 +54,15 @@ export function SubmittedList({ campaignId, formId, channel, pageSize = 20, comp
           <TableRow><TableHead className="w-6" /><TableHead>일시</TableHead>{!compact && <TableHead>캠페인 / 폼</TableHead>}<TableHead>채널</TableHead><TableHead>내용</TableHead></TableRow>
         </TableHeader>
         <TableBody>
-          {items.length === 0 && <TableRow><TableCell colSpan={cols} className="py-8 text-center text-muted-foreground">신청이 없습니다.</TableCell></TableRow>}
+          {items.length === 0 && <EmptyRow colSpan={cols} loading={data === null}>신청이 없습니다.</EmptyRow>}
           {items.map((s) => (
             <Fragment key={s.id}>
-              <TableRow className="cursor-pointer" onClick={() => toggle(s)} aria-expanded={open === s.id}>
-                <TableCell className="text-muted-foreground">{open === s.id ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}</TableCell>
+              <TableRow className="cursor-pointer" onClick={() => toggle(s)}>
+                <TableCell className="text-muted-foreground">
+                  <button type="button" aria-expanded={open === s.id} aria-controls={`journey-${s.id}`} aria-label="여정 보기" className="flex" onClick={(e) => { e.stopPropagation(); toggle(s); }}>
+                    {open === s.id ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                  </button>
+                </TableCell>
                 <TableCell className="whitespace-nowrap text-muted-foreground">{fmtDate(s.createdAt)}</TableCell>
                 {!compact && (
                   <TableCell>
@@ -70,13 +79,8 @@ export function SubmittedList({ campaignId, formId, channel, pageSize = 20, comp
               </TableRow>
               {open === s.id && (
                 <TableRow className="hover:bg-transparent">
-                  <TableCell colSpan={cols} className="bg-muted/40 px-6 py-3">
-                    {journeys[s.id]
-                      ? <>
-                          <div className="mb-2 text-xs text-muted-foreground">방문 {journeys[s.id].visits}회 · 첫 방문에서 신청까지 {duration(journeys[s.id].secondsToSubmit)}</div>
-                          <JourneyTimeline events={journeys[s.id].events} />
-                        </>
-                      : <div className="text-xs text-muted-foreground">불러오는 중…</div>}
+                  <TableCell colSpan={cols} className="bg-muted/40 px-6 py-3" id={`journey-${s.id}`}>
+                    <JourneyCell j={journeys[s.id]} />
                   </TableCell>
                 </TableRow>
               )}
@@ -85,6 +89,17 @@ export function SubmittedList({ campaignId, formId, channel, pageSize = 20, comp
         </TableBody>
       </Table>
       <Pager page={page} total={data?.total ?? 0} pageSize={pageSize} onChange={setPage} />
+    </>
+  );
+}
+
+function JourneyCell({ j }: { j: Journey | { error: string } | undefined }) {
+  if (!j) return <div className="text-xs text-muted-foreground">불러오는 중…</div>;
+  if ('error' in j) return <div className="text-xs text-destructive">{j.error}</div>;
+  return (
+    <>
+      <div className="mb-2 text-xs text-muted-foreground">방문 {j.visits}회 · 첫 방문에서 신청까지 {duration(j.secondsToSubmit)}</div>
+      <JourneyTimeline events={j.events} />
     </>
   );
 }

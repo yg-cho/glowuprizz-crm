@@ -22,17 +22,17 @@ export function useStatsFilters(defaults: Partial<StatsFilters> = {}) {
     campaignId: sp.get('campaignId') || defaults.campaignId || undefined,
     formId: sp.get('formId') || defaults.formId || undefined,
     channel: (sp.get('channel') as Channel) || defaults.channel || undefined,
-    compare: sp.get('compare') === '1' || (sp.get('compare') === null && !!defaults.compare),
+    compare: sp.has('compare') ? sp.get('compare') === '1' : !!defaults.compare,
   }), [sp, defaults.range, defaults.campaignId, defaults.formId, defaults.channel, defaults.compare]);
 
   const set = useCallback((patch: Partial<StatsFilters>) => {
     const next = new URLSearchParams(sp.toString());
-    const put = (k: string, v: string | boolean | undefined) => { if (v === undefined || v === '' || v === false) next.delete(k); else next.set(k, v === true ? '1' : v); };
+    const put = (k: string, v: string | undefined) => { if (v === undefined || v === '') next.delete(k); else next.set(k, v); };
     if ('range' in patch) put('range', patch.range);
     if ('campaignId' in patch) put('campaignId', patch.campaignId);
     if ('formId' in patch) put('formId', patch.formId);
     if ('channel' in patch) put('channel', patch.channel);
-    if ('compare' in patch) put('compare', patch.compare);
+    if ('compare' in patch) put('compare', patch.compare ? '1' : '0'); // false 도 저장해야 기본값(true)으로 되돌아가지 않음
     router.replace(`${pathname}?${next.toString()}`, { scroll: false });
   }, [sp, router, pathname]);
 

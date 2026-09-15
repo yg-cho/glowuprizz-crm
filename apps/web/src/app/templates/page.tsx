@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
 import { ConfirmButton } from '@/components/confirm-button';
 import { ErrorText } from '@/components/error-text';
+import { EmptyRow } from '@/components/empty-row';
 import { Section } from '@/components/stats/section';
 import { useApi, useAction } from '@/lib/use-api';
 import { api, Template } from '@/lib/api';
@@ -47,12 +48,12 @@ export default function TemplatesPage() {
           </form>
         </Section>
 
-        <Section title="등록된 템플릿" className="lg:col-span-2">
+        <Section title="등록된 템플릿" className="lg:col-span-2" state={list}>
           <ErrorText>{remove.error}</ErrorText>
           <Table>
             <TableHeader><TableRow><TableHead>이름</TableHead><TableHead className="text-right">크기</TableHead><TableHead className="text-right">사용 폼</TableHead><TableHead>등록일</TableHead><TableHead /></TableRow></TableHeader>
             <TableBody>
-              {items.length === 0 && <TableRow><TableCell colSpan={5} className="py-8 text-center text-muted-foreground">아직 없습니다.</TableCell></TableRow>}
+              {items.length === 0 && <EmptyRow colSpan={5} loading={list.data === null}>아직 없습니다.</EmptyRow>}
               {items.map((t) => (
                 <TableRow key={t.id}>
                   <TableCell className="font-medium">{t.name}</TableCell>

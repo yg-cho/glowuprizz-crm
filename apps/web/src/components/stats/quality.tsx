@@ -3,7 +3,8 @@ import { pct, fmtNum, failureLabel } from '@/lib/format';
 import type { Failure, Quality } from '@/lib/api';
 
 /** 제출 실패 사유 표 */
-export function FailuresTable({ rows }: { rows: Failure[] }) {
+export function FailuresTable({ rows }: { rows: Failure[] | null }) {
+  if (rows === null) return <p className="py-4 text-sm text-muted-foreground">불러오는 중…</p>;
   if (rows.length === 0) return <p className="py-4 text-sm text-muted-foreground">실패 없음</p>;
   return (
     <Table>

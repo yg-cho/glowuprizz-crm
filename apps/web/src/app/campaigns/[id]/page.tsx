@@ -13,6 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { StatusBadge } from '@/components/channel-badge';
 import { ConfirmButton } from '@/components/confirm-button';
 import { ErrorText } from '@/components/error-text';
+import { EmptyRow } from '@/components/empty-row';
 import { FiltersBar } from '@/components/stats/filters-bar';
 import { StageCards } from '@/components/stats/stage-cards';
 import { LinkTable } from '@/components/stats/link-table';
@@ -33,13 +34,14 @@ function CampaignDetail() {
 
   const { data: campaign } = useApi<Campaign>(`/campaigns/${id}`);
   const { data: templates } = useApi<Template[]>('/templates');
-  const { data: funnel } = useApi<Funnel>(`/stats/funnel?${q}`);
-  const { data: links } = useApi<LinkStats[]>(`/stats/links?${q}`);
-  const { data: forms } = useApi<FormStats[]>(`/stats/forms?${q}`);
-  const { data: heatmap } = useApi<HeatmapData>(`/stats/heatmap?${q}`);
-  const { data: failures } = useApi<Failure[]>(`/stats/failures?${q}`);
-  const { data: quality } = useApi<Quality>(`/stats/quality?${q}`);
-  const publicOrigin = usePublicOrigin(campaign?.forms?.[0]?.id);
+  const funnelQ = useApi<Funnel>(`/stats/funnel?${q}`);
+  const linksQ = useApi<LinkStats[]>(`/stats/links?${q}`);
+  const formsQ = useApi<FormStats[]>(`/stats/forms?${q}`);
+  const heatmapQ = useApi<HeatmapData>(`/stats/heatmap?${q}`);
+  const failuresQ = useApi<Failure[]>(`/stats/failures?${q}`);
+  const qualityQ = useApi<Quality>(`/stats/quality?${q}`);
+  const publicOrigin = usePublicOrigin();
+  const funnel = funnelQ.data;
 
   const [name, setName] = useState('');
   const [slug, setSlug] = useState('');
@@ -76,21 +78,22 @@ function CampaignDetail() {
         )}
       />
 
+      {funnelQ.error && <ErrorText>{funnelQ.error}</ErrorText>}
       {funnel && <StageCards funnel={funnel.current} previous={funnel.previous} />}
 
       <div className="mb-3 grid gap-3 lg:grid-cols-5">
-        <Section title="링크별 성과" desc="같은 채널 안에서도 게시 위치별로." className="lg:col-span-3">
-          <LinkTable rows={links ?? []} publicOrigin={publicOrigin} showForm={formOptions.length > 1} />
+        <Section title="링크별 성과" desc="같은 채널 안에서도 게시 위치별로." className="lg:col-span-3" state={linksQ}>
+          <LinkTable rows={linksQ.data} publicOrigin={publicOrigin} showForm={formOptions.length > 1} />
         </Section>
-        <Section title="폼 비교" desc="템플릿을 여러 개 붙이면 그대로 A/B 비교." className="lg:col-span-2">
-          <FormCompare rows={forms ?? []} />
+        <Section title="폼 비교" desc="템플릿을 여러 개 붙이면 그대로 A/B 비교." className="lg:col-span-2" state={formsQ}>
+          <FormCompare rows={formsQ.data} />
         </Section>
       </div>
 
       <div className="mb-8 grid gap-3 lg:grid-cols-3">
-        <Section title="시간대별 클릭" desc="요일 × 시간(KST). 게시 타이밍 참고.">{heatmap && <Heatmap data={heatmap} />}</Section>
-        <Section title="제출 실패" desc="제출 시도 → 완료 사이"><FailuresTable rows={failures ?? []} /></Section>
-        <Section title="방문자 품질" desc="재방문과 중복">{quality && <QualityList q={quality} />}</Section>
+        <Section title="시간대별 클릭" desc="요일 × 시간(KST). 게시 타이밍 참고." state={heatmapQ}>{heatmapQ.data && <Heatmap data={heatmapQ.data} />}</Section>
+        <Section title="제출 실패" desc="제출 시도 → 완료 사이" state={failuresQ}><FailuresTable rows={failuresQ.data} /></Section>
+        <Section title="방문자 품질" desc="재방문과 중복" state={qualityQ}>{qualityQ.data && <QualityList q={qualityQ.data} />}</Section>
       </div>
 
       <h2 className="mb-3 text-base font-semibold">폼 관리</h2>
@@ -115,7 +118,7 @@ function CampaignDetail() {
           <Table>
             <TableHeader><TableRow><TableHead>폼</TableHead><TableHead>템플릿</TableHead><TableHead>상태</TableHead><TableHead className="text-right">링크</TableHead><TableHead className="text-right">신청</TableHead></TableRow></TableHeader>
             <TableBody>
-              {formOptions.length === 0 && <TableRow><TableCell colSpan={5} className="py-8 text-center text-muted-foreground">폼이 없습니다.</TableCell></TableRow>}
+              {formOptions.length === 0 && <EmptyRow colSpan={5} loading={campaign === null}>폼이 없습니다.</EmptyRow>}
               {formOptions.map((f) => (
                 <TableRow key={f.id}>
                   <TableCell><Link href={`/forms/${f.id}`} className="font-medium hover:underline">{f.name}</Link><div className="text-xs text-muted-foreground">/{f.slug}</div></TableCell>

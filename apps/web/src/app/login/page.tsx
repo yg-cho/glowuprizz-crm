@@ -10,6 +10,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
+/** 같은 사이트의 경로만 허용 (// 나 절대 URL 은 오픈 리다이렉트) */
+const safeNext = (v: string | null) => (v && v.startsWith('/') && !v.startsWith('//') ? v : '/');
+
 function LoginForm() {
   const router = useRouter();
   const params = useSearchParams();
@@ -21,7 +24,7 @@ function LoginForm() {
     } catch (err) {
       throw err instanceof ApiError && err.status === 401 ? new ApiError(401, '이메일 또는 비밀번호가 올바르지 않습니다.') : err;
     }
-    router.push(params.get('next') || '/');
+    router.push(safeNext(params.get('next')));
   }, '로그인에 실패했습니다.');
 
   return (

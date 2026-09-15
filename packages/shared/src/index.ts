@@ -44,6 +44,9 @@ export const CLIENT_EVENT_MAP: Record<ClientEventType, EventType> = {
   submit_error: 'SUBMIT_ERROR',
 };
 
+/** 채널·링크 비교에서 '최저' 색 표시를 할 최소 표본(링크 클릭 방문자) */
+export const MIN_SAMPLE = 10;
+
 export type StageCounts = Record<Stage, number>;
 export interface FunnelStage {
   type: Stage;
