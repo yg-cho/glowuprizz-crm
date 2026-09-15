@@ -6,6 +6,7 @@ import { Throttle } from '@nestjs/throttler';
 import { VISITOR_COOKIE, isSecureRequest } from '@glowuprizz/shared';
 import { PublicService } from './public.service';
 import { SubmitDto } from './dto/submit.dto';
+import { EventDto } from './dto/event.dto';
 import { buildCsp, buildInjectScript, injectScript } from './inject';
 
 const VISITOR_COOKIE_MAX_AGE = 1000 * 60 * 60 * 24 * 365;
@@ -28,6 +29,11 @@ export class PublicController {
       });
     }
     return vid;
+  }
+
+  private visitorIdFrom(req: Request): string | null {
+    const vid: string | undefined = req.cookies?.[VISITOR_COOKIE];
+    return vid && /^[0-9a-f-]{36}$/.test(vid) ? vid : null;
   }
 
   private render(res: Response, html: string, slug: string, linkCode: string | null) {
@@ -70,9 +76,19 @@ export class PublicController {
   @ApiResponse({ status: 403, description: '폼 일시중지' })
   @ApiResponse({ status: 404, description: '폼 없음' })
   async submit(@Param('slug') slug: string, @Body() dto: SubmitDto, @Req() req: Request) {
-    const vid: string | undefined = req.cookies?.[VISITOR_COOKIE];
-    const visitorId = vid && /^[0-9a-f-]{36}$/.test(vid) ? vid : null;
-    return this.svc.submit(slug, dto.linkCode ?? null, dto.fields, visitorId, req.ip);
+    return this.svc.submit(slug, dto.linkCode ?? null, dto.fields, this.visitorIdFrom(req), req.ip);
+  }
+
+  @Post('f/:slug/events')
+  @HttpCode(204)
+  @Throttle({ default: { ttl: 60_000, limit: 120 } })
+  @ApiOperation({ summary: '퍼널 이벤트 수집 (form_view / form_start / submit_attempt / submit_error). 주입 스크립트가 sendBeacon 으로 호출' })
+  @ApiResponse({ status: 204, description: '기록됨 (방문자 쿠키 없으면 무시)' })
+  @ApiResponse({ status: 400, description: 'type/meta 검증 실패' })
+  @ApiResponse({ status: 403, description: '폼 일시중지' })
+  @ApiResponse({ status: 404, description: '폼 없음' })
+  async event(@Param('slug') slug: string, @Body() dto: EventDto, @Req() req: Request) {
+    await this.svc.recordClientEvent(slug, dto, this.visitorIdFrom(req), req.ip, req.headers['user-agent']);
   }
 
   @Get('healthz')

@@ -1,15 +1,40 @@
 /**
- * 등록 HTML 에 주입되는 제출 스크립트.
- * - 페이지의 첫 <form> submit 을 가로채 필드를 JSON 으로 POST.
- * - 같은 origin 의 /f/:slug/submissions 만 호출 (CSP connect-src 'self').
- * - 성공 시 폼을 감사 메시지로 교체, 실패 시 alert.
+ * 등록 HTML 에 주입되는 스크립트.
+ * - 퍼널 이벤트(form_view / form_start / submit_attempt / submit_error) 를 /f/:slug/events 로 전송.
+ * - 페이지의 첫 <form> submit 을 가로채 필드를 JSON 으로 /f/:slug/submissions 에 POST.
+ * - 모두 같은 origin (CSP connect-src 'self'). 성공 시 폼을 감사 메시지로 교체, 실패 시 alert.
  */
 export function buildInjectScript(slug: string, linkCode: string | null): string {
-  const endpoint = `/f/${encodeURIComponent(slug)}/submissions`;
+  const submitUrl = `/f/${encodeURIComponent(slug)}/submissions`;
+  const eventUrl = `/f/${encodeURIComponent(slug)}/events`;
   return `
 (function(){
+  var LINK = ${JSON.stringify(linkCode)};
   var form = document.querySelector('form');
-  if (!form) return;
+  // 퍼널 이벤트 전송. sendBeacon 우선(페이지 이탈 중에도 전달), 없으면 keepalive fetch.
+  function track(type, meta){
+    try {
+      var body = JSON.stringify({ linkCode: LINK, type: type, meta: meta || {} });
+      if (navigator.sendBeacon) {
+        navigator.sendBeacon(${JSON.stringify(eventUrl)}, new Blob([body], { type: 'application/json' }));
+      } else {
+        fetch(${JSON.stringify(eventUrl)}, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: body, keepalive: true, credentials: 'same-origin' });
+      }
+    } catch (e) {}
+  }
+  if (!form) { track('form_view', { hasForm: false }); return; }
+  track('form_view', { hasForm: true, fields: form.querySelectorAll('input,select,textarea').length });
+
+  var started = false;
+  function onStart(e){
+    if (started) return; started = true;
+    var el = e && e.target;
+    track('form_start', { field: (el && (el.name || el.id)) || null });
+  }
+  form.addEventListener('input', onStart, true);
+  form.addEventListener('change', onStart, true);
+  form.addEventListener('focusin', onStart, true);
+
   form.addEventListener('submit', function(e){
     e.preventDefault();
     var fd = new FormData(form);
@@ -22,19 +47,21 @@ export function buildInjectScript(slug: string, linkCode: string | null): string
     });
     var btn = form.querySelector('[type=submit]');
     if (btn) btn.disabled = true;
-    fetch(${JSON.stringify(endpoint)}, {
+    track('submit_attempt', { fields: Object.keys(fields).length });
+    fetch(${JSON.stringify(submitUrl)}, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'same-origin',
-      body: JSON.stringify({ linkCode: ${JSON.stringify(linkCode)}, fields: fields })
+      body: JSON.stringify({ linkCode: LINK, fields: fields })
     }).then(function(r){
-      if (!r.ok) throw new Error('submit failed: ' + r.status);
+      if (!r.ok) { track('submit_error', { reason: 'http', status: r.status }); throw new Error('submit failed: ' + r.status); }
       var done = document.createElement('div');
       done.setAttribute('data-gu-success', '1');
       done.style.cssText = 'padding:24px;text-align:center;font-family:system-ui,sans-serif;font-size:18px';
       done.textContent = '신청이 완료되었습니다. 감사합니다!';
       form.replaceWith(done);
     }).catch(function(err){
+      if (!/submit failed/.test(String(err && err.message))) track('submit_error', { reason: 'network' });
       if (btn) btn.disabled = false;
       alert('제출에 실패했습니다. 잠시 후 다시 시도해 주세요.');
       console.error(err);
