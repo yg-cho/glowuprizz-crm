@@ -62,7 +62,7 @@ export interface Submission {
   link: { id: string; channel: Channel; code: string } | null;
 }
 // ---- 성과 (apps/api stats) — 단계 수는 고유 방문자 기준. 단계/채널 상수는 @glowuprizz/shared
-export type { Stage, StageCounts, FunnelStage, EventType } from '@glowuprizz/shared';
+export type { Stage, EventType } from '@glowuprizz/shared';
 import type { Stage, StageCounts, FunnelStage, EventType } from '@glowuprizz/shared';
 export interface FunnelSnapshot { stages: FunnelStage[]; pageViews: number; submitErrors: number; overallRate: number; maxDropStage: Stage | null }
 export interface Funnel { range: string; period: { from: string | null; to: string | null }; current: FunnelSnapshot; previous: (FunnelSnapshot & { period: { from: string; to: string } }) | null }
@@ -78,4 +78,3 @@ export interface Insight { level: 'warn' | 'info'; text: string }
 export interface JourneyEvent { id: string; type: EventType; meta: Record<string, unknown> | null; createdAt: string; link: { id: string; channel: Channel; code: string } | null }
 export interface VisitorRow { visitorId: string; formId: string; firstSeen: string; lastSeen: string; views: number; lastChannel: Channel | null; lastStage: string; journey: JourneyEvent[] }
 export interface Journey { submission: { id: string; formId: string; visitorId: string | null; createdAt: string; link: { id: string; channel: Channel; code: string } | null }; events: JourneyEvent[]; visits: number; secondsToSubmit: number }
-export interface Overview { visits: number; visitors: number; submissions: number; campaigns: number; forms: number; conversionRate: number }

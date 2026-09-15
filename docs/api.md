@@ -229,9 +229,6 @@
               "journey": [{ "id": "uuid", "type": "VIEW", "meta": null, "createdAt": "...", "link": { "id": "uuid", "channel": "X", "code": "…" } }] }] }
 ```
 
-### GET `/api/stats/overview`
-전 기간 합계(대시보드 하위 호환): `{ visits, visitors, submissions, campaigns, forms, conversionRate }`.
-
 ---
 
 ## 8. 공개 폼 (`apps/forms`, 인증 없음)

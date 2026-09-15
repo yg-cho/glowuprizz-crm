@@ -300,17 +300,6 @@ export class StatsService {
     return { total, page, pageSize, items };
   }
 
-  /** 운영자 전체 합계 (대시보드 상단 카드) — 하위 호환 */
-  async overview(operatorId: string) {
-    const g = await this.stageGroup({ operatorId }, { from: null, to: null });
-    const [submissions, campaigns, forms] = await Promise.all([
-      this.prisma.submission.count({ where: { form: { campaign: { operatorId } } } }),
-      this.prisma.campaign.count({ where: { operatorId } }),
-      this.prisma.form.count({ where: { campaign: { operatorId } } }),
-    ]);
-    return { visits: g.events.VIEW, visitors: g.stages.VIEW, submissions, campaigns, forms, conversionRate: rate(submissions, g.stages.VIEW) };
-  }
-
 }
 
 const label = (c: Channel) => CHANNEL_LABELS[c];
