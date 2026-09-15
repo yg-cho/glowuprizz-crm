@@ -11,7 +11,7 @@ export const prisma = new PrismaClient();
 export async function resetDb() {
   // FK 순서 무관하게 전체 비움
   await prisma.$executeRawUnsafe(
-    'TRUNCATE TABLE submissions, visits, distribution_links, forms, campaigns, html_templates, operators RESTART IDENTITY CASCADE',
+    'TRUNCATE TABLE submissions, events, distribution_links, forms, campaigns, html_templates, operators RESTART IDENTITY CASCADE',
   );
 }
 

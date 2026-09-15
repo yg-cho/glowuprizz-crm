@@ -28,7 +28,7 @@ describe('Public forms (e2e)', () => {
   afterAll(async () => { await app.close(); await prisma.$disconnect(); });
 
   beforeEach(async () => {
-    await prisma.$executeRawUnsafe('TRUNCATE TABLE submissions, visits, distribution_links, forms, campaigns, html_templates, operators RESTART IDENTITY CASCADE');
+    await prisma.$executeRawUnsafe('TRUNCATE TABLE submissions, events, distribution_links, forms, campaigns, html_templates, operators RESTART IDENTITY CASCADE');
     const op = await prisma.operator.create({ data: { email: 'op@test.com', passwordHash: 'x' } });
     const tpl = await prisma.htmlTemplate.create({ data: { operatorId: op.id, name: 't', html: HTML, sizeBytes: HTML.length } });
     const camp = await prisma.campaign.create({ data: { operatorId: op.id, name: 'c' } });
@@ -63,7 +63,7 @@ describe('Public forms (e2e)', () => {
       expect(res.headers['x-frame-options']).toBe('DENY');
       expect(res.headers['cache-control']).toBe('no-store');
 
-      const visits = await prisma.visit.findMany({ where: { formId } });
+      const visits = await prisma.event.findMany({ where: { formId, type: 'VIEW' } });
       expect(visits).toHaveLength(1);
       expect(visits[0].linkId).not.toBeNull();
       expect(visits[0].visitorId).toMatch(/^[0-9a-f-]{36}$/);
@@ -74,8 +74,8 @@ describe('Public forms (e2e)', () => {
       const vid = (first.headers['set-cookie'] as unknown as string[]).find((c) => c.startsWith('gu_vid='))!.split(';')[0];
       const second = await request(app.getHttpServer()).get(`/l/${igCode}`).set('Cookie', vid).expect(200);
       expect(second.headers['set-cookie']).toBeUndefined(); // 재발급 없음
-      const distinct = await prisma.visit.findMany({ where: { formId }, distinct: ['visitorId'] });
-      expect(await prisma.visit.count({ where: { formId } })).toBe(2);
+      const distinct = await prisma.event.findMany({ where: { formId, type: 'VIEW' }, distinct: ['visitorId'] });
+      expect(await prisma.event.count({ where: { formId, type: 'VIEW' } })).toBe(2);
       expect(distinct).toHaveLength(1);
     });
 
@@ -83,13 +83,13 @@ describe('Public forms (e2e)', () => {
       await request(app.getHttpServer()).get('/l/nope0000').expect(404);
       await prisma.form.update({ where: { id: formId }, data: { status: 'PAUSED' } });
       await request(app.getHttpServer()).get(`/l/${igCode}`).expect(403);
-      expect(await prisma.visit.count()).toBe(0);
+      expect(await prisma.event.count()).toBe(0);
     });
 
     it('GET /f/:slug 직접 접근은 linkId 없이 기록, linkCode null 주입', async () => {
       const res = await request(app.getHttpServer()).get('/f/my-form').expect(200);
       expect(res.text).toContain('linkCode: null');
-      const v = await prisma.visit.findFirst({ where: { formId } });
+      const v = await prisma.event.findFirst({ where: { formId, type: 'VIEW' } });
       expect(v?.linkId).toBeNull();
     });
   });
@@ -108,6 +108,9 @@ describe('Public forms (e2e)', () => {
       expect(s.link?.channel).toBe('INSTAGRAM');
       expect(s.visitorId).toBe(vid.split('=')[1]);
       expect(s.ipHash).toBeTruthy();
+      const ev = await prisma.event.findFirst({ where: { formId, type: 'SUBMIT_SUCCESS' } });
+      expect(ev?.visitorId).toBe(s.visitorId);
+      expect(ev?.linkId).toBe(s.linkId);
     });
 
     it('linkCode 없으면 직접 유입으로 저장', async () => {

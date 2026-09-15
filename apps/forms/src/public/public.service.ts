@@ -33,12 +33,14 @@ export class PublicService {
     return form;
   }
 
+  /** 링크 클릭(페이지 렌더) = VIEW 이벤트 */
   recordVisit(input: { formId: string; linkId: string | null; visitorId: string; ip?: string; userAgent?: string }) {
-    return this.prisma.visit.create({
+    return this.prisma.event.create({
       data: {
         formId: input.formId,
         linkId: input.linkId,
         visitorId: input.visitorId,
+        type: 'VIEW',
         ipHash: this.hashIp(input.ip),
         userAgent: input.userAgent?.slice(0, 500),
       },
@@ -66,10 +68,19 @@ export class PublicService {
       if (link && link.formId === form.id) linkId = link.id;
     }
 
-    const s = await this.prisma.submission.create({
-      data: { formId: form.id, linkId, visitorId, payload, ipHash: this.hashIp(ip) },
-      select: { id: true, createdAt: true },
+    const ipHash = this.hashIp(ip);
+    // 신청 저장 + SUBMIT_SUCCESS 이벤트를 한 트랜잭션으로 (퍼널 마지막 단계)
+    return this.prisma.$transaction(async (tx) => {
+      const s = await tx.submission.create({
+        data: { formId: form.id, linkId, visitorId, payload, ipHash },
+        select: { id: true, createdAt: true },
+      });
+      if (visitorId) {
+        await tx.event.create({
+          data: { formId: form.id, linkId, visitorId, type: 'SUBMIT_SUCCESS', meta: { submissionId: s.id }, ipHash },
+        });
+      }
+      return s;
     });
-    return s;
   }
 }

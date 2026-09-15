@@ -21,7 +21,8 @@ export class StatsService {
       FROM campaigns c
       LEFT JOIN (
         SELECT f."campaignId", COUNT(*) AS visits, COUNT(DISTINCT vi."visitorId") AS visitors
-        FROM visits vi JOIN forms f ON f.id = vi."formId"
+        FROM events vi JOIN forms f ON f.id = vi."formId"
+        WHERE vi.type = 'VIEW'
         GROUP BY f."campaignId"
       ) v ON v."campaignId" = c.id
       LEFT JOIN (
@@ -55,11 +56,11 @@ export class StatsService {
       FROM (SELECT unnest(enum_range(NULL::"Channel")) AS channel) ch
       LEFT JOIN (
         SELECT dl.channel, COUNT(*) AS visits, COUNT(DISTINCT vi."visitorId") AS visitors
-        FROM visits vi
+        FROM events vi
         JOIN distribution_links dl ON dl.id = vi."linkId"
         JOIN forms f ON f.id = vi."formId"
         JOIN campaigns c ON c.id = f."campaignId"
-        WHERE c."operatorId" = ${operatorId} ${campaignFilter}
+        WHERE vi.type = 'VIEW' AND c."operatorId" = ${operatorId} ${campaignFilter}
         GROUP BY dl.channel
       ) v ON v.channel = ch.channel
       LEFT JOIN (
@@ -83,8 +84,8 @@ export class StatsService {
   /** 운영자 전체 합계 (대시보드 상단 카드) */
   async overview(operatorId: string) {
     const [visits, visitorsRows, submissions, campaigns, forms] = await Promise.all([
-      this.prisma.visit.count({ where: { form: { campaign: { operatorId } } } }),
-      this.prisma.visit.findMany({ where: { form: { campaign: { operatorId } } }, distinct: ['visitorId'], select: { visitorId: true } }),
+      this.prisma.event.count({ where: { type: 'VIEW', form: { campaign: { operatorId } } } }),
+      this.prisma.event.findMany({ where: { type: 'VIEW', form: { campaign: { operatorId } } }, distinct: ['visitorId'], select: { visitorId: true } }),
       this.prisma.submission.count({ where: { form: { campaign: { operatorId } } } }),
       this.prisma.campaign.count({ where: { operatorId } }),
       this.prisma.form.count({ where: { campaign: { operatorId } } }),
