@@ -1,13 +1,15 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@glowuprizz/db';
-import { CHANNELS, CHANNEL_LABELS, Channel, STAGES, Stage } from '@glowuprizz/shared';
+import { CHANNELS, CHANNEL_LABELS, Channel, EVENT_RANK, STAGES, Stage } from '@glowuprizz/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { OwnershipService } from '../common/ownership.service';
 import { normalizePage } from '../common/pagination';
 import { StatsQueryDto, VisitorsQueryDto } from './dto/stats-query.dto';
-import { Period, resolvePeriod } from './period';
+import { DAY_MS, Period, resolvePeriod, startOfKstDay } from './period';
 import { StageGroup, emptyGroup, funnelSnapshot, kstDay, num, rate, stageList } from './metrics';
-import { loadJourney } from './journey';
+import { loadJourneys } from './journey';
+
+const FAILURE_ROWS = 20;
 
 interface Scope { operatorId: string; campaignId?: string; formId?: string; channel?: Channel }
 type TypeRow = { key: string | null; type: string; visitors: bigint; events: bigint };
@@ -98,11 +100,13 @@ export class StatsService {
              COUNT(DISTINCT "visitorId") FILTER (WHERE type = 'SUBMIT_SUCCESS') AS submissions
       FROM ev GROUP BY 1 ORDER BY 1`);
     const byDay = new Map(rows.map((r) => [r.day, r]));
-    const days: string[] = [];
-    if (current.from && current.to) {
-      for (let t = current.from.getTime(); t < current.to.getTime(); t += 86_400_000) days.push(kstDay(new Date(t)));
-    } else days.push(...byDay.keys());
-    return days.map((day) => {
+    // 기간을 KST 자정으로 정렬해 순회하고, 경계 밖으로 나간 SQL 결과 날짜도 합친다. all 은 첫~마지막 데이터 날짜.
+    const sqlDays = [...byDay.keys()].sort();
+    const start = current.from ?? (sqlDays[0] ? new Date(`${sqlDays[0]}T00:00:00+09:00`) : null);
+    const end = current.to ?? (sqlDays.at(-1) ? new Date(new Date(`${sqlDays.at(-1)}T00:00:00+09:00`).getTime() + DAY_MS) : null);
+    const days = new Set<string>(sqlDays);
+    if (start && end) for (let t = startOfKstDay(start).getTime(); t < end.getTime(); t += DAY_MS) days.add(kstDay(new Date(t)));
+    return [...days].sort().map((day) => {
       const r = byDay.get(day);
       const visitors = num(r?.visitors), formStarts = num(r?.form_starts), submissions = num(r?.submissions);
       return { day, visitors, formStarts, submissions, conversionRate: rate(submissions, visitors) };
@@ -202,8 +206,13 @@ export class StatsService {
     const rows = await this.prisma.$queryRaw<{ reason: string | null; status: string | null; count: bigint }[]>(Prisma.sql`
       WITH ev AS (${this.ev(s, current)})
       SELECT meta->>'reason' AS reason, meta->>'status' AS status, COUNT(*) AS count
-      FROM ev WHERE type = 'SUBMIT_ERROR' GROUP BY 1, 2 ORDER BY 3 DESC`);
-    return rows.map((r) => ({ reason: r.reason ?? 'unknown', status: r.status ? Number(r.status) : null, count: num(r.count) }));
+      FROM ev WHERE type = 'SUBMIT_ERROR' GROUP BY 1, 2 ORDER BY 3 DESC LIMIT ${FAILURE_ROWS + 1}`);
+    const list = rows.map((r) => ({ reason: r.reason ?? 'unknown', status: r.status ? Number(r.status) : null, count: num(r.count) }));
+    if (list.length <= FAILURE_ROWS) return list;
+    // 사유 카디널리티 상한: 나머지는 '기타' 로 합산
+    const head = list.slice(0, FAILURE_ROWS);
+    const rest = list.slice(FAILURE_ROWS).reduce((a, r) => a + r.count, 0);
+    return [...head, { reason: 'other', status: null, count: rest }];
   }
 
   /** 방문자 품질: 재방문 후 신청 비율, 중복 전화번호, 봇 의심(폼 도달 없이 이탈). */
@@ -220,9 +229,8 @@ export class StatsService {
         WITH ev AS (${this.ev(s, current)})
         SELECT COUNT(*) AS total, COUNT(DISTINCT regexp_replace(su.payload->>'phone', '\\D', '', 'g')) AS distinct_phones
         FROM submissions su
-        WHERE su."formId" IN (SELECT DISTINCT "formId" FROM ev) AND su.payload ? 'phone'
-          ${current.from ? Prisma.sql`AND su."createdAt" >= ${current.from}` : Prisma.empty}
-          ${current.to ? Prisma.sql`AND su."createdAt" < ${current.to}` : Prisma.empty}`),
+        JOIN ev ON ev.type = 'SUBMIT_SUCCESS' AND ev.meta->>'submissionId' = su.id
+        WHERE su.payload ? 'phone'`),
       this.stageCountsBy(null, s, current),
     ]);
     const r = revisit[0], d = dup[0];
@@ -239,9 +247,16 @@ export class StatsService {
 
   /** 규칙 기반 주목점. 채널·단계 수치에서 임계값 넘는 것만. */
   async insights(operatorId: string, q: StatsQueryDto) {
-    const [f, ch] = await Promise.all([this.funnel(operatorId, q), this.channels(operatorId, q)]);
+    const s = await this.scope(operatorId, q);
+    const { current } = resolvePeriod(q);
+    const [total, byChannel] = await Promise.all([this.stageGroup(s, current), this.stageCountsBy(Prisma.sql`channel`, s, current, Prisma.sql`WHERE channel IS NOT NULL`)]);
+    const cur = funnelSnapshot(total);
+    const totalSubmissions = [...byChannel.values()].reduce((a, g) => a + g.stages.SUBMIT_SUCCESS, 0);
+    const ch = CHANNELS.map((channel) => {
+      const g = byChannel.get(channel) ?? emptyGroup();
+      return { channel, ...g.stages, clickToSubmit: rate(g.stages.SUBMIT_SUCCESS, g.stages.VIEW), share: rate(g.stages.SUBMIT_SUCCESS, totalSubmissions) };
+    });
     const notes: { level: 'warn' | 'info'; text: string }[] = [];
-    const cur = f.current;
     if (cur.stages[0].visitors < 20) return notes; // 표본 부족
     if (cur.maxDropStage) {
       const st = cur.stages.find((x) => x.type === cur.maxDropStage)!;
@@ -265,41 +280,43 @@ export class StatsService {
     return notes;
   }
 
-  /** 단계까지 도달한 방문자 목록 (신청/미신청). 미신청 = 리마케팅 후보. */
+  /** 단계까지 도달한 방문자 목록 (신청/미신청). 미신청 = 리마케팅 후보. 폼 단위로 묶는다. */
   async visitors(operatorId: string, q: VisitorsQueryDto) {
     const s = await this.scope(operatorId, q);
     const { current } = resolvePeriod(q);
-    const stage = q.stage ?? 'FORM_START';
+    const stageRank = EVENT_RANK[q.stage ?? 'FORM_START'];
     const submitted = q.submitted ?? false;
     const { page, pageSize, skip, take } = normalizePage(q.page, q.pageSize);
-    type Row = { visitorId: string; formId: string; first_seen: Date; last_seen: Date; views: bigint; last_channel: Channel | null; last_stage: string; total: bigint };
-    const rows = await this.prisma.$queryRaw<Row[]>(Prisma.sql`
+    // 단계 도달 = 그 단계 이상 어느 이벤트든 있음 (비콘 유실로 중간 단계가 빠져도 인정)
+    const rankExpr = Prisma.sql`CASE type ${Prisma.join(Object.entries(EVENT_RANK).map(([t, r]) => Prisma.sql`WHEN ${t}::"EventType" THEN ${r}`), ' ')} END`;
+    const agg = Prisma.sql`
       WITH ev AS (${this.ev(s, current)}),
       agg AS (
-        SELECT "visitorId", (array_agg("formId" ORDER BY "createdAt" DESC))[1] AS "formId",
+        SELECT "visitorId", "formId",
                MIN("createdAt") AS first_seen, MAX("createdAt") AS last_seen,
                COUNT(*) FILTER (WHERE type = 'VIEW') AS views,
                (array_agg(channel ORDER BY "createdAt" DESC) FILTER (WHERE channel IS NOT NULL))[1] AS last_channel,
-               bool_or(type = ${stage}::"EventType") AS reached,
-               bool_or(type = 'SUBMIT_SUCCESS') AS did_submit,
-               CASE WHEN bool_or(type = 'SUBMIT_SUCCESS') THEN 'SUBMIT_SUCCESS'
-                    WHEN bool_or(type = 'SUBMIT_ATTEMPT') THEN 'SUBMIT_ATTEMPT'
-                    WHEN bool_or(type = 'FORM_START') THEN 'FORM_START'
-                    WHEN bool_or(type = 'FORM_VIEW') THEN 'FORM_VIEW' ELSE 'VIEW' END AS last_stage
-        FROM ev GROUP BY "visitorId"
+               MAX(${rankExpr}) FILTER (WHERE type <> 'SUBMIT_ERROR') AS max_rank,
+               bool_or(type = 'SUBMIT_SUCCESS') AS did_submit
+        FROM ev GROUP BY "visitorId", "formId"
       )
-      SELECT "visitorId", "formId", first_seen, last_seen, views, last_channel, last_stage, COUNT(*) OVER() AS total
-      FROM agg WHERE reached AND did_submit = ${submitted}
-      ORDER BY last_seen DESC LIMIT ${take} OFFSET ${skip}`);
-    const total = rows.length ? num(rows[0].total) : 0;
-    const items = await Promise.all(rows.map(async (r) => ({
-      visitorId: r.visitorId, formId: r.formId, firstSeen: r.first_seen, lastSeen: r.last_seen,
-      views: num(r.views), lastChannel: r.last_channel, lastStage: r.last_stage,
-      journey: await loadJourney(this.prisma, r.formId, r.visitorId),
-    })));
-    return { total, page, pageSize, items };
+      SELECT * FROM agg WHERE max_rank >= ${stageRank} AND did_submit = ${submitted}`;
+    type Row = { visitorId: string; formId: string; first_seen: Date; last_seen: Date; views: bigint; last_channel: Channel | null; max_rank: number };
+    const [rows, totalRows] = await Promise.all([
+      this.prisma.$queryRaw<Row[]>(Prisma.sql`${agg} ORDER BY last_seen DESC LIMIT ${take} OFFSET ${skip}`),
+      this.prisma.$queryRaw<{ total: bigint }[]>(Prisma.sql`SELECT COUNT(*) AS total FROM (${agg}) t`),
+    ]);
+    const journeys = await loadJourneys(this.prisma, rows);
+    const rankToStage = Object.fromEntries(Object.entries(EVENT_RANK).map(([t, r]) => [r, t]));
+    return {
+      total: num(totalRows[0]?.total), page, pageSize,
+      items: rows.map((r) => ({
+        visitorId: r.visitorId, formId: r.formId, firstSeen: r.first_seen, lastSeen: r.last_seen,
+        views: num(r.views), lastChannel: r.last_channel, lastStage: rankToStage[r.max_rank] ?? 'VIEW',
+        journey: journeys.get(`${r.formId}:${r.visitorId}`) ?? [],
+      })),
+    };
   }
-
 }
 
 const label = (c: Channel) => CHANNEL_LABELS[c];

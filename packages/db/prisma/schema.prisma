@@ -125,6 +125,7 @@ model Event {
   link DistributionLink? @relation(fields: [linkId], references: [id], onDelete: SetNull)
 
   @@index([formId, type, createdAt])
+  @@index([formId, createdAt])
   @@index([formId, visitorId])
   @@index([visitorId, createdAt])
   @@index([linkId])

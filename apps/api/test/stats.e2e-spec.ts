@@ -40,8 +40,8 @@ describe('Funnel stats (e2e)', () => {
     await ev(formA, igLink, 'v1', 'FORM_VIEW', at('2026-09-12', 21));
     await ev(formA, igLink, 'v1', 'FORM_START', at('2026-09-12', 21), { field: 'name' });
     await ev(formA, igLink, 'v1', 'SUBMIT_ATTEMPT', at('2026-09-12', 21));
-    await ev(formA, igLink, 'v1', 'SUBMIT_SUCCESS', at('2026-09-12', 21));
-    await prisma.submission.create({ data: { formId: formA, linkId: igLink, visitorId: 'v1', payload: { name: 'A', phone: '010-1111-2222' }, createdAt: at('2026-09-12', 21) } });
+    const sub1 = await prisma.submission.create({ data: { formId: formA, linkId: igLink, visitorId: 'v1', payload: { name: 'A', phone: '010-1111-2222' }, createdAt: at('2026-09-12', 21) } });
+    await ev(formA, igLink, 'v1', 'SUBMIT_SUCCESS', at('2026-09-12', 21), { submissionId: sub1.id }); // forms 가 넣는 형태
     // v2 (인스타, 폼A): 작성 시작만 (미신청) 9/13
     await ev(formA, igLink, 'v2', 'VIEW', at('2026-09-13', 10));
     await ev(formA, igLink, 'v2', 'FORM_VIEW', at('2026-09-13', 10));
@@ -53,8 +53,8 @@ describe('Funnel stats (e2e)', () => {
     await ev(formA, ytLink, 'v3', 'SUBMIT_ATTEMPT', at('2026-09-14', 9));
     await ev(formA, ytLink, 'v3', 'SUBMIT_ERROR', at('2026-09-14', 9), { reason: 'network' });
     await ev(formA, ytLink, 'v3', 'SUBMIT_ATTEMPT', at('2026-09-14', 9));
-    await ev(formA, ytLink, 'v3', 'SUBMIT_SUCCESS', at('2026-09-14', 9));
-    await prisma.submission.create({ data: { formId: formA, linkId: ytLink, visitorId: 'v3', payload: { name: 'C', phone: '01011112222' }, createdAt: at('2026-09-14', 9) } }); // v1 과 같은 번호(중복)
+    const sub3 = await prisma.submission.create({ data: { formId: formA, linkId: ytLink, visitorId: 'v3', payload: { name: 'C', phone: '01011112222' }, createdAt: at('2026-09-14', 9) } }); // v1 과 같은 번호(중복)
+    await ev(formA, ytLink, 'v3', 'SUBMIT_SUCCESS', at('2026-09-14', 9), { submissionId: sub3.id });
     // v4 (X, 폼B): 클릭만 (봇 의심) 9/14
     await ev(formB, xLink, 'v4', 'VIEW', at('2026-09-14', 15));
     // v5 (직접 유입, 폼B): 폼 도달까지 9/15
@@ -106,6 +106,36 @@ describe('Funnel stats (e2e)', () => {
     expect(d['2026-09-12']).toMatchObject({ visitors: 1, formStarts: 1, submissions: 1, conversionRate: 1 });
     expect(d['2026-09-14']).toMatchObject({ visitors: 2, submissions: 1, conversionRate: 0.5 });
     expect(d['2026-09-11']).toMatchObject({ visitors: 0, submissions: 0 });
+  });
+
+  it('timeseries: KST 자정에 정렬되지 않은 custom 기간도 마지막 날 데이터를 잃지 않음, 날짜만 온 from/to 는 KST 로', async () => {
+    // 9/12 06:00 KST ~ 9/14 18:00 KST → 9/12·9/13·9/14 전부 나와야 함 (v3 는 9/14 09:00)
+    const r = (await get(`/api/stats/timeseries?range=custom&from=2026-09-12T06:00:00%2B09:00&to=2026-09-14T18:00:00%2B09:00`).expect(200)).body;
+    expect(r.map((d: { day: string }) => d.day)).toEqual(['2026-09-12', '2026-09-13', '2026-09-14']);
+    expect(r[2]).toMatchObject({ submissions: 1 });
+    // 날짜만: 2026-09-14 ~ 2026-09-15 = KST 9/14 하루 → v3, v4 = 방문자 2
+    const d = (await get(`/api/stats/funnel?range=custom&from=2026-09-14&to=2026-09-15`).expect(200)).body;
+    expect(d.current.stages[0].visitors).toBe(2);
+  });
+
+  it('quality: 중복 전화번호가 채널 필터를 따름 (인스타만 보면 v1 하나 → 중복 0)', async () => {
+    const all = (await get(`/api/stats/quality?${qs()}`).expect(200)).body;
+    expect(all.duplicatePhones).toBe(1);
+    const ig = (await get(`/api/stats/quality?${qs({ channel: 'INSTAGRAM' })}`).expect(200)).body;
+    expect(ig.duplicatePhones).toBe(0);
+  });
+
+  it('visitors: 중간 단계 비콘이 빠져도 상위 단계가 있으면 도달로 인정, total 은 페이지와 무관', async () => {
+    // v8: FORM_START 없이 SUBMIT_ATTEMPT 만 (비콘 유실)
+    await ev(formB, xLink, 'v8', 'VIEW', at('2026-09-13', 12));
+    await ev(formB, xLink, 'v8', 'SUBMIT_ATTEMPT', at('2026-09-13', 12));
+    const r = (await get(`/api/stats/visitors?${qs({ stage: 'FORM_START', submitted: 'false' })}`).expect(200)).body;
+    expect(r.items.map((i: { visitorId: string }) => i.visitorId).sort()).toEqual(['v2', 'v8']);
+    expect(r.items.find((i: { visitorId: string }) => i.visitorId === 'v8').lastStage).toBe('SUBMIT_ATTEMPT');
+    const page2 = (await get(`/api/stats/visitors?${qs({ stage: 'FORM_START', submitted: 'false', page: '5', pageSize: '1' })}`).expect(200)).body;
+    expect(page2.total).toBe(2);
+    expect(page2.items).toHaveLength(0);
+    await prisma.event.deleteMany({ where: { visitorId: 'v8' } });
   });
 
   it('channels: 4채널 고정, 직접 유입 제외, 기여도', async () => {

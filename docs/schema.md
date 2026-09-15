@@ -90,7 +90,7 @@ erDiagram
 ## 인덱스
 
 - `html_templates(operatorId)`, `campaigns(operatorId)`, `forms(campaignId)`, `distribution_links(formId)`
-- `events(formId, type, createdAt)`, `events(formId, visitorId)`, `events(visitorId, createdAt)`, `events(linkId)` — 단계별 집계, 고유 방문자, 여정 조회
+- `events(formId, type, createdAt)`, `events(formId, createdAt)`, `events(formId, visitorId)`, `events(visitorId, createdAt)`, `events(linkId)` — 단계별 집계, 기간 필터, 고유 방문자, 여정 조회
 - `submissions(formId, createdAt)`, `submissions(linkId)`
 
 ## 삭제 정책

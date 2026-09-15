@@ -4,11 +4,17 @@ import { Range } from './dto/stats-query.dto';
 export interface Period { from: Date | null; to: Date | null }
 export interface ResolvedPeriod { range: Range; current: Period; previous: Period | null }
 
-const DAY = 86_400_000;
+export const DAY_MS = 86_400_000;
+const DAY = DAY_MS;
 const KST_OFFSET = 9 * 3_600_000;
 
+/** 날짜만 온 값(YYYY-MM-DD)은 KST 자정으로, 시각이 있으면 그대로 */
+function parseBoundary(v: string): Date {
+  return /^\d{4}-\d{2}-\d{2}$/.test(v) ? new Date(`${v}T00:00:00+09:00`) : new Date(v);
+}
+
 /** KST 자정 기준 하루 시작 (UTC Date) */
-function startOfKstDay(d: Date): Date {
+export function startOfKstDay(d: Date): Date {
   const kst = new Date(d.getTime() + KST_OFFSET);
   kst.setUTCHours(0, 0, 0, 0);
   return new Date(kst.getTime() - KST_OFFSET);
@@ -23,8 +29,8 @@ export function resolvePeriod(q: { range?: Range; from?: string; to?: string; co
   let current: Period;
   if (range === 'all') current = { from: null, to: null };
   else if (range === 'custom') {
-    const from = q.from ? new Date(q.from) : null;
-    const to = q.to ? new Date(q.to) : null;
+    const from = q.from ? parseBoundary(q.from) : null;
+    const to = q.to ? parseBoundary(q.to) : null;
     if ((from && isNaN(+from)) || (to && isNaN(+to))) throw new BadRequestException('invalid from/to');
     if (from && to && from >= to) throw new BadRequestException('from must be before to');
     current = { from, to };
