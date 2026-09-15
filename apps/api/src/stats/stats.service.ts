@@ -327,13 +327,13 @@ export class StatsService {
     return { total, page, pageSize, items };
   }
 
-  /** 특정 방문자의 폼 내 이벤트 타임라인 */
+  /** 특정 방문자의 폼 내 이벤트 타임라인 (동시각은 단계 순) */
   async journeyOf(formId: string, visitorId: string) {
     const events = await this.prisma.event.findMany({
       where: { formId, visitorId }, orderBy: { createdAt: 'asc' },
       select: { id: true, type: true, meta: true, createdAt: true, link: { select: { id: true, channel: true, code: true } } },
     });
-    return events;
+    return sortJourney(events);
   }
 
   /** 운영자 전체 합계 (대시보드 상단 카드) — 하위 호환 */
@@ -347,6 +347,12 @@ export class StatsService {
     return { visits: g.events.VIEW, visitors: g.stages.VIEW, submissions, campaigns, forms, conversionRate: rate(submissions, g.stages.VIEW) };
   }
 
+}
+
+/** 같은 밀리초에 찍힌 이벤트(비콘이 제출 응답 뒤에 도착)는 단계 순서로 정렬 */
+const EVENT_RANK: Record<string, number> = { VIEW: 0, FORM_VIEW: 1, FORM_START: 2, SUBMIT_ATTEMPT: 3, SUBMIT_ERROR: 4, SUBMIT_SUCCESS: 5 };
+export function sortJourney<T extends { type: string; createdAt: Date }>(events: T[]): T[] {
+  return [...events].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime() || EVENT_RANK[a.type] - EVENT_RANK[b.type]);
 }
 
 const label = (c: Channel) => ({ INSTAGRAM: '인스타그램', X: 'X', YOUTUBE: '유튜브', THREADS: '스레드' })[c];

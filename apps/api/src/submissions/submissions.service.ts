@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { sortJourney } from '../stats/stats.service';
 
 @Injectable()
 export class SubmissionsService {
@@ -13,10 +14,10 @@ export class SubmissionsService {
     });
     if (!sub) throw new NotFoundException('submission not found');
     const events = sub.visitorId
-      ? await this.prisma.event.findMany({
+      ? sortJourney(await this.prisma.event.findMany({
           where: { formId: sub.formId, visitorId: sub.visitorId }, orderBy: { createdAt: 'asc' },
           select: { id: true, type: true, meta: true, createdAt: true, link: { select: { id: true, channel: true, code: true } } },
-        })
+        }))
       : [];
     const first = events[0]?.createdAt ?? sub.createdAt;
     return {
