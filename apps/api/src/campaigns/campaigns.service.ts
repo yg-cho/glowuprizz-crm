@@ -1,0 +1,34 @@
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { PrismaService } from '../prisma/prisma.service';
+import { CreateCampaignDto } from './dto/create-campaign.dto';
+
+@Injectable()
+export class CampaignsService {
+  constructor(private readonly prisma: PrismaService) {}
+
+  create(operatorId: string, dto: CreateCampaignDto) {
+    return this.prisma.campaign.create({ data: { operatorId, ...dto } });
+  }
+
+  list(operatorId: string) {
+    return this.prisma.campaign.findMany({
+      where: { operatorId },
+      orderBy: { createdAt: 'desc' },
+      include: { _count: { select: { forms: true } } },
+    });
+  }
+
+  async get(operatorId: string, id: string) {
+    const c = await this.prisma.campaign.findFirst({
+      where: { id, operatorId },
+      include: { forms: { include: { template: { select: { id: true, name: true } }, _count: { select: { links: true, submissions: true } } } } },
+    });
+    if (!c) throw new NotFoundException('campaign not found');
+    return c;
+  }
+
+  async remove(operatorId: string, id: string) {
+    await this.get(operatorId, id);
+    await this.prisma.campaign.delete({ where: { id } });
+  }
+}
