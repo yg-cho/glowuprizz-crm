@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { Pause, Play, Plus, Trash2 } from 'lucide-react';
 import { CHANNEL_OPTIONS, type Channel } from '@glowuprizz/shared';
-import { Shell, PageTitle } from '@/components/shell';
+import { PageTitle } from '@/components/shell';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -38,7 +38,7 @@ export default function FormDetailPage() {
 
   const f = form.data;
   return (
-    <Shell>
+    <>
       {f?.campaign && <div className="mb-1 text-sm text-muted-foreground"><Link href={`/campaigns/${f.campaign.id}`} className="hover:underline">{f.campaign.name}</Link> / 폼</div>}
       <PageTitle
         title={f?.name ?? '…'}
@@ -76,6 +76,6 @@ export default function FormDetailPage() {
           <SubmittedList formId={id} compact />
         </Section>
       </div>
-    </Shell>
+    </>
   );
 }

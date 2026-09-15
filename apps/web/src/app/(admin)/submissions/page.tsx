@@ -1,7 +1,7 @@
 'use client';
 
-import { Suspense, useState } from 'react';
-import { Shell, PageTitle } from '@/components/shell';
+import { useState } from 'react';
+import { PageTitle } from '@/components/shell';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { FiltersBar } from '@/components/stats/filters-bar';
@@ -13,7 +13,7 @@ import type { Campaign } from '@/lib/api';
 
 type Mode = 'submitted' | 'abandoned';
 
-function SubmissionsView() {
+export default function SubmissionsView() {
   const { filters, set, query } = useStatsFilters({ range: 'all' });
   const [mode, setMode] = useState<Mode>('submitted');
   const { data: campaigns } = useApi<Campaign[]>('/campaigns');
@@ -40,10 +40,3 @@ function SubmissionsView() {
   );
 }
 
-export default function SubmissionsPage() {
-  return (
-    <Shell>
-      <Suspense><SubmissionsView /></Suspense>
-    </Shell>
-  );
-}

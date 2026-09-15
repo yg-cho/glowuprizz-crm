@@ -1,8 +1,7 @@
 'use client';
 
-import { Suspense } from 'react';
 import Link from 'next/link';
-import { Shell, PageTitle } from '@/components/shell';
+import { PageTitle } from '@/components/shell';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { FiltersBar } from '@/components/stats/filters-bar';
 import { StageCards } from '@/components/stats/stage-cards';
@@ -19,7 +18,7 @@ import { useApi } from '@/lib/use-api';
 import type { Campaign, CampaignStats, ChannelStats, Failure, Funnel, Insight, TimeseriesPoint } from '@/lib/api';
 import { pct, fmtNum, fmtDay, failureShort } from '@/lib/format';
 
-function Dashboard() {
+export default function Dashboard() {
   const { filters, set, query } = useStatsFilters({ range: '7d', compare: true });
   const q = query();
   const { data: campaignList } = useApi<Campaign[]>('/campaigns');
@@ -82,10 +81,3 @@ function Dashboard() {
   );
 }
 
-export default function DashboardPage() {
-  return (
-    <Shell>
-      <Suspense><Dashboard /></Suspense>
-    </Shell>
-  );
-}

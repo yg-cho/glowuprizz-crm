@@ -2,7 +2,7 @@
 
 import { useRef, useState } from 'react';
 import { Upload, Trash2, Eye } from 'lucide-react';
-import { Shell, PageTitle } from '@/components/shell';
+import { PageTitle } from '@/components/shell';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -36,7 +36,7 @@ export default function TemplatesPage() {
 
   const items = list.data ?? [];
   return (
-    <Shell>
+    <>
       <PageTitle title="HTML 템플릿" desc="AI로 만든 단일 .html 파일을 등록합니다. <form> 요소가 포함되어야 합니다." />
       <div className="grid gap-3 lg:grid-cols-3">
         <Section title="새 템플릿 등록" desc=".html, 최대 512KB">
@@ -77,6 +77,6 @@ export default function TemplatesPage() {
           <pre className="max-h-96 overflow-auto rounded-md bg-neutral-950 p-4 text-xs text-neutral-100">{preview.html}</pre>
         </Section>
       )}
-    </Shell>
+    </>
   );
 }

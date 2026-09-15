@@ -1,10 +1,10 @@
 'use client';
 
-import { Suspense, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { Plus, Trash2 } from 'lucide-react';
-import { Shell, PageTitle } from '@/components/shell';
+import { PageTitle } from '@/components/shell';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -26,7 +26,7 @@ import { useApi, useAction } from '@/lib/use-api';
 import { usePublicOrigin } from '@/lib/use-public-origin';
 import { api, Campaign, Failure, FormStats, Funnel, Heatmap as HeatmapData, LinkStats, Quality, Template } from '@/lib/api';
 
-function CampaignDetail() {
+export default function CampaignDetail() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const { filters, set, query } = useStatsFilters({ range: '7d', compare: true });
@@ -136,10 +136,3 @@ function CampaignDetail() {
   );
 }
 
-export default function CampaignDetailPage() {
-  return (
-    <Shell>
-      <Suspense><CampaignDetail /></Suspense>
-    </Shell>
-  );
-}

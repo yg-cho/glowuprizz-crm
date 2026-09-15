@@ -22,8 +22,8 @@ export function Shell({ children }: { children: React.ReactNode }) {
   };
   return (
     <div className="flex min-h-screen">
-      <aside className="w-56 shrink-0 border-r border-gray-200 bg-white p-4">
-        <div className="mb-6 flex items-center gap-2 px-2 text-sm font-bold">
+      <aside className="w-56 shrink-0 border-r bg-card p-4">
+        <div className="mb-6 flex items-center gap-2 px-2 text-sm font-semibold">
           <ListChecks className="h-5 w-5" /> 리드마그넷 CRM
         </div>
         <nav className="flex flex-col gap-1">
@@ -31,13 +31,14 @@ export function Shell({ children }: { children: React.ReactNode }) {
             const active = n.href === '/' ? path === '/' : path.startsWith(n.href);
             return (
               <Link key={n.href} href={n.href}
-                className={cn('flex items-center gap-2 rounded-md px-3 py-2 text-sm', active ? 'bg-gray-900 text-white' : 'text-gray-700 hover:bg-gray-100')}>
+                className={cn('flex items-center gap-2 rounded-md px-3 py-2 text-sm', active ? 'bg-primary text-primary-foreground' : 'text-foreground/80 hover:bg-muted')}
+                aria-current={active ? 'page' : undefined}>
                 <n.icon className="h-4 w-4" /> {n.label}
               </Link>
             );
           })}
         </nav>
-        <button onClick={logout} className="mt-8 flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-gray-500 hover:bg-gray-100">
+        <button onClick={logout} className="mt-8 flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-muted">
           <LogOut className="h-4 w-4" /> 로그아웃
         </button>
       </aside>
@@ -51,7 +52,7 @@ export function PageTitle({ title, desc, right }: { title: string; desc?: string
     <div className="mb-6 flex items-start justify-between gap-4">
       <div>
         <h1 className="text-2xl font-bold">{title}</h1>
-        {desc && <p className="mt-1 text-sm text-gray-500">{desc}</p>}
+        {desc && <p className="mt-1 text-sm text-muted-foreground">{desc}</p>}
       </div>
       {right}
     </div>
