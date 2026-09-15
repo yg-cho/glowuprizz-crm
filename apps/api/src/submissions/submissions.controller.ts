@@ -1,4 +1,4 @@
-import { Controller, DefaultValuePipe, Get, ParseIntPipe, Query, UseGuards } from '@nestjs/common';
+import { Controller, DefaultValuePipe, Get, Param, ParseIntPipe, ParseUUIDPipe, Query, UseGuards } from '@nestjs/common';
 import { ApiCookieAuth, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentOperator, OperatorPrincipal } from '../common/current-operator.decorator';
@@ -25,5 +25,11 @@ export class SubmissionsController {
     @Query('pageSize', new DefaultValuePipe(20), ParseIntPipe) pageSize = 20,
   ) {
     return this.submissions.list(op.id, { formId, campaignId, page: Math.max(1, page), pageSize: Math.min(100, Math.max(1, pageSize)) });
+  }
+
+  @Get(':id/journey')
+  @ApiOperation({ summary: '신청 1건의 방문자 여정: 채널 → 클릭 → 폼 도달 → 작성 → 제출 이벤트 타임라인' })
+  journey(@CurrentOperator() op: OperatorPrincipal, @Param('id', ParseUUIDPipe) id: string) {
+    return this.submissions.journey(op.id, id);
   }
 }
