@@ -11,12 +11,10 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
 import { ChannelBadge, StatusBadge } from '@/components/channel-badge';
-import { api, ApiError, Channel, FormRow, Link as DistLink, Submission } from '@/lib/api';
+import { CHANNEL_OPTIONS, type Channel } from '@glowuprizz/shared';
+import { api, ApiError, FormRow, Link as DistLink, Submission } from '@/lib/api';
 import { fmtDate } from '@/lib/utils';
 
-const CHANNELS: { value: Channel; label: string }[] = [
-  { value: 'INSTAGRAM', label: '인스타그램' }, { value: 'X', label: 'X' }, { value: 'YOUTUBE', label: '유튜브' }, { value: 'THREADS', label: '스레드' },
-];
 
 export default function FormDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -83,7 +81,7 @@ export default function FormDetailPage() {
                 <Label htmlFor="link-channel">채널</Label>
                 <Select value={channel} onValueChange={(v) => setChannel(v as Channel)}>
                   <SelectTrigger id="link-channel"><SelectValue /></SelectTrigger>
-                  <SelectContent>{CHANNELS.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}</SelectContent>
+                  <SelectContent>{CHANNEL_OPTIONS.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
               {error && <p role="alert" className="text-sm text-red-600">{error}</p>}

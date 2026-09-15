@@ -1,9 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsIn, IsObject, IsOptional, IsString, Matches } from 'class-validator';
 
-/** 브라우저(주입 스크립트)가 보낼 수 있는 이벤트. VIEW·SUBMIT_SUCCESS 는 서버만 기록한다. */
-export const CLIENT_EVENT_TYPES = ['form_view', 'form_start', 'submit_attempt', 'submit_error'] as const;
-export type ClientEventType = (typeof CLIENT_EVENT_TYPES)[number];
+import { CLIENT_EVENT_TYPES, ClientEventType } from '@glowuprizz/shared';
 
 export class EventDto {
   @ApiProperty({ required: false, example: 'k3m9pq2x' })

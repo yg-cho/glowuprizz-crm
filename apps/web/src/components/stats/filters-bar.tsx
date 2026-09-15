@@ -3,11 +3,8 @@
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { RANGES, type Range, type StatsFilters } from '@/lib/stats-filters';
-import type { Campaign, Channel } from '@/lib/api';
-
-const CHANNEL_OPTIONS: { value: Channel; label: string }[] = [
-  { value: 'INSTAGRAM', label: '인스타그램' }, { value: 'X', label: 'X' }, { value: 'YOUTUBE', label: '유튜브' }, { value: 'THREADS', label: '스레드' },
-];
+import { CHANNEL_OPTIONS, type Channel } from '@glowuprizz/shared';
+import type { Campaign } from '@/lib/api';
 
 interface Props {
   filters: StatsFilters;

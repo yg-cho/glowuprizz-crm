@@ -1,19 +1,12 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { EventType, Prisma } from '@glowuprizz/db';
-import { ClientEventType } from './dto/event.dto';
+import { Prisma } from '@glowuprizz/db';
+import { CLIENT_EVENT_MAP, ClientEventType } from '@glowuprizz/shared';
 import { createHash } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 
 const MAX_FIELDS = 50;
 const MAX_VALUE_LEN = 2000;
 const MAX_META_BYTES = 1024;
-
-const CLIENT_EVENT_MAP: Record<ClientEventType, EventType> = {
-  form_view: 'FORM_VIEW',
-  form_start: 'FORM_START',
-  submit_attempt: 'SUBMIT_ATTEMPT',
-  submit_error: 'SUBMIT_ERROR',
-};
 
 @Injectable()
 export class PublicService {

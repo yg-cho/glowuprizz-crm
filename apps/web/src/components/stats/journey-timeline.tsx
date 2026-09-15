@@ -1,10 +1,6 @@
+import { CHANNEL_LABELS, EVENT_LABELS as LABEL, STAGES as ORDER, type Channel, type Stage } from '@glowuprizz/shared';
 import { cn } from '@/lib/utils';
-import type { JourneyEvent, Stage } from '@/lib/api';
-
-const LABEL: Record<JourneyEvent['type'], string> = {
-  VIEW: '링크 클릭', FORM_VIEW: '폼 도달', FORM_START: '작성 시작', SUBMIT_ATTEMPT: '제출 시도', SUBMIT_ERROR: '제출 실패', SUBMIT_SUCCESS: '신청 완료',
-};
-const ORDER: Stage[] = ['VIEW', 'FORM_VIEW', 'FORM_START', 'SUBMIT_ATTEMPT', 'SUBMIT_SUCCESS'];
+import type { JourneyEvent } from '@/lib/api';
 const REASON: Record<string, string> = { network: '네트워크', http: '서버 응답' };
 
 const time = (iso: string) => new Date(iso).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
@@ -28,7 +24,7 @@ export function JourneyTimeline({ events }: { events: JourneyEvent[] }) {
       // 이전 방문에서 작성 없이 끝났으면 '이탈' 표시
       const last = items[items.length - 1];
       if (views > 1 && last && (last.label === '폼 도달' || last.label === '링크 클릭')) items.push({ key: `miss${views}`, label: '이탈', sub: '작성 없이 닫음', kind: 'miss' });
-      items.push({ key: e.id, label: views === 1 ? '링크 클릭' : '재방문', sub: t + (e.link ? ` · ${channelLabel(e.link.channel)}` : ''), kind: 'done' });
+      items.push({ key: e.id, label: views === 1 ? '링크 클릭' : '재방문', sub: t + (e.link ? ` · ${CHANNEL_LABELS[e.link.channel as Channel]}` : ''), kind: 'done' });
     } else if (e.type === 'SUBMIT_ERROR') {
       const m = (e.meta ?? {}) as { reason?: string; status?: number };
       items.push({ key: e.id, label: '제출 실패', sub: `${t} · ${REASON[m.reason ?? ''] ?? m.reason ?? ''}${m.status ? ` ${m.status}` : ''}`, kind: 'error' });
@@ -60,7 +56,6 @@ export function JourneyTimeline({ events }: { events: JourneyEvent[] }) {
   );
 }
 
-const channelLabel = (c: string) => ({ INSTAGRAM: '인스타그램', X: 'X', YOUTUBE: '유튜브', THREADS: '스레드' })[c] ?? c;
 function hintFor(next: Stage, events: JourneyEvent[]) {
   if (next === 'FORM_VIEW') return '스크립트 실행 전 이탈 · 봇 가능';
   if (next === 'FORM_START') return '폼은 봤지만 입력 없음';
