@@ -14,7 +14,7 @@ import { Insights } from '@/components/stats/insights';
 import { Section } from '@/components/stats/section';
 import { useStatsFilters } from '@/lib/stats-filters';
 import { api, Campaign, CampaignStats, ChannelStats, Failure, Funnel, Insight, TimeseriesPoint } from '@/lib/api';
-import { pct, fmtNum, fmtDate } from '@/lib/utils';
+import { pct, fmtNum, fmtDay } from '@/lib/utils';
 
 function Dashboard() {
   const { filters, set, query } = useStatsFilters({ range: '7d', compare: true });
@@ -72,7 +72,7 @@ function Dashboard() {
                 <TableRow key={c.campaignId}>
                   <TableCell>
                     <Link href={`/campaigns/${c.campaignId}?range=${filters.range}`} className="font-medium hover:underline">{c.campaignName}</Link>
-                    <div className="text-xs text-muted-foreground">폼 {c.formsCount} · 링크 {c.linksCount} · {fmtDate(c.createdAt).split(' ')[0]} 시작</div>
+                    <div className="text-xs text-muted-foreground">폼 {c.formsCount} · 링크 {c.linksCount} · {fmtDay(c.createdAt)} 시작</div>
                   </TableCell>
                   <TableCell className="text-right tabular-nums">{fmtNum(c.VIEW)}</TableCell>
                   <TableCell className="text-right tabular-nums">{fmtNum(c.SUBMIT_SUCCESS)}</TableCell>
