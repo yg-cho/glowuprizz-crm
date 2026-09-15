@@ -1,5 +1,3 @@
-'use client';
-
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 /** 클립보드 복사 + 1.5초 "복사됨" 표시. 실패(비보안 컨텍스트)는 조용히 무시하지 않고 false 반환. */

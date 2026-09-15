@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { Plus } from 'lucide-react';
-import { Shell, PageTitle } from '@/components/shell';
+import { PageTitle } from '@/components/shell';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -26,7 +26,7 @@ export default function CampaignsPage() {
 
   const items = list.data ?? [];
   return (
-    <Shell>
+    <>
       <PageTitle title="캠페인 · 폼" desc="캠페인을 만들고, 캠페인 안에서 HTML 템플릿 기반 신청 폼과 채널별 배포 링크를 만듭니다." />
       <div className="grid gap-3 lg:grid-cols-3">
         <Section title="새 캠페인">
@@ -53,6 +53,6 @@ export default function CampaignsPage() {
           </Table>
         </Section>
       </div>
-    </Shell>
+    </>
   );
 }

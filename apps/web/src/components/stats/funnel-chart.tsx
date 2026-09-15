@@ -1,4 +1,5 @@
-import { cn, pct, fmtNum } from '@/lib/utils';
+import { cn } from '@/lib/utils';
+import { pct, fmtNum } from '@/lib/format';
 import type { FunnelSnapshot } from '@/lib/api';
 
 /** 가로 막대 퍼널. 막대 사이 단계 전환율·이탈. 최대 이탈만 색. */
@@ -12,9 +13,12 @@ export function FunnelChart({ funnel, failures }: { funnel: FunnelSnapshot; fail
         return (
           <div key={s.type}>
             {i > 0 && (
-              <div className={cn('ml-[112px] flex gap-4 text-xs', isMaxDrop ? 'text-destructive' : 'text-muted-foreground')}>
-                <span>{pct(s.stepRate)}{isMaxDrop && ' · 최대 이탈'}</span>
-                <span>{s.type === 'SUBMIT_SUCCESS' ? <>실패 {funnel.submitErrors}{failures && ` · ${failures}`}</> : <>이탈 {fmtNum(s.dropoff)}</>}</span>
+              <div className={cn('grid grid-cols-[100px_1fr_72px] gap-3 text-xs', isMaxDrop ? 'text-destructive' : 'text-muted-foreground')}>
+                <span />
+                <span className="flex gap-4">
+                  <span>{pct(s.stepRate)}{isMaxDrop && ' · 최대 이탈'}</span>
+                  <span>{s.type === 'SUBMIT_SUCCESS' ? <>실패 {funnel.submitErrors}{failures && ` · ${failures}`}</> : <>이탈 {fmtNum(s.dropoff)}</>}</span>
+                </span>
               </div>
             )}
             <div className="my-2 grid grid-cols-[100px_1fr_72px] items-center gap-3 text-sm">
