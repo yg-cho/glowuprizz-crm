@@ -1,137 +1,79 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { Copy, ExternalLink, Pause, Play, Plus, Trash2 } from 'lucide-react';
+import { Pause, Play, Plus, Trash2 } from 'lucide-react';
+import { CHANNEL_OPTIONS, type Channel } from '@glowuprizz/shared';
 import { Shell, PageTitle } from '@/components/shell';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
-import { ChannelBadge, StatusBadge } from '@/components/channel-badge';
-import { CHANNEL_OPTIONS, type Channel } from '@glowuprizz/shared';
-import { api, ApiError, FormRow, Link as DistLink, Submission } from '@/lib/api';
-import { fmtDate } from '@/lib/utils';
-
+import { StatusBadge } from '@/components/channel-badge';
+import { ConfirmButton } from '@/components/confirm-button';
+import { ErrorText } from '@/components/error-text';
+import { Section } from '@/components/stats/section';
+import { LinkTable } from '@/components/stats/link-table';
+import { SubmittedList } from '@/components/crm/submitted-list';
+import { useApi, useAction } from '@/lib/use-api';
+import { usePublicOrigin } from '@/lib/use-public-origin';
+import { api, FormRow, LinkStats } from '@/lib/api';
 
 export default function FormDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
-  const [form, setForm] = useState<FormRow | null>(null);
-  const [links, setLinks] = useState<DistLink[]>([]);
-  const [subs, setSubs] = useState<{ total: number; items: Submission[] } | null>(null);
+  const form = useApi<FormRow>(`/forms/${id}`);
+  const links = useApi<LinkStats[]>(`/stats/links?range=all&formId=${id}`);
+  const publicOrigin = usePublicOrigin(id);
   const [channel, setChannel] = useState<Channel>('INSTAGRAM');
-  const [copied, setCopied] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
-    const [f, l, s] = await Promise.all([
-      api.get<FormRow>(`/forms/${id}`),
-      api.get<DistLink[]>(`/links?formId=${id}`),
-      api.get<{ total: number; items: Submission[] }>(`/submissions?formId=${id}&pageSize=50`),
-    ]);
-    setForm(f); setLinks(l); setSubs(s);
-  }, [id]);
-  useEffect(() => { load(); }, [load]);
-
-  const createLink = async (e: React.FormEvent) => {
-    e.preventDefault(); setError(null);
-    try { await api.post('/links', { formId: id, channel }); await load(); }
-    catch (err) { setError(err instanceof ApiError ? err.message : '생성 실패'); }
-  };
-  const removeLink = async (l: DistLink) => {
-    if (!confirm('링크를 삭제할까요? 기존 방문/신청 데이터는 유지됩니다.')) return;
-    await api.del(`/links/${l.id}`); await load();
-  };
-  const copy = async (l: DistLink) => { await navigator.clipboard.writeText(l.url); setCopied(l.id); setTimeout(() => setCopied(null), 1500); };
+  const createLink = useAction(async () => { await api.post('/links', { formId: id, channel }); links.reload(); form.reload(); }, '링크를 만들지 못했습니다.');
+  const removeLink = async (l: LinkStats) => { await api.del(`/links/${l.linkId}`); links.reload(); form.reload(); };
   const toggle = async () => {
-    if (!form) return;
-    await api.patch(`/forms/${id}`, { status: form.status === 'ACTIVE' ? 'PAUSED' : 'ACTIVE' }); await load();
+    if (!form.data) return;
+    await api.patch(`/forms/${id}`, { status: form.data.status === 'ACTIVE' ? 'PAUSED' : 'ACTIVE' });
+    form.reload();
   };
-  const removeForm = async () => {
-    if (!confirm('폼과 링크/신청 데이터가 삭제됩니다. 계속할까요?')) return;
-    await api.del(`/forms/${id}`); router.push(form?.campaign ? `/campaigns/${form.campaign.id}` : '/campaigns');
-  };
+  const removeForm = async () => { await api.del(`/forms/${id}`); router.push(form.data?.campaign ? `/campaigns/${form.data.campaign.id}` : '/campaigns'); };
 
-  const fieldKeys = Array.from(new Set((subs?.items ?? []).flatMap((s) => Object.keys(s.payload)))).slice(0, 6);
-
+  const f = form.data;
   return (
     <Shell>
+      {f?.campaign && <div className="mb-1 text-sm text-muted-foreground"><Link href={`/campaigns/${f.campaign.id}`} className="hover:underline">{f.campaign.name}</Link> / 폼</div>}
       <PageTitle
-        title={form?.name ?? '…'}
-        desc={form ? `캠페인: ${form.campaign?.name} · 템플릿: ${form.template?.name} · /${form.slug}` : undefined}
-        right={form && (
+        title={f?.name ?? '…'}
+        desc={f ? `템플릿: ${f.template?.name} · /${f.slug}` : undefined}
+        right={f && (
           <div className="flex items-center gap-2">
-            <StatusBadge status={form.status} />
-            <Button size="sm" variant="outline" onClick={toggle}>{form.status === 'ACTIVE' ? <><Pause className="h-3.5 w-3.5" /> 일시중지</> : <><Play className="h-3.5 w-3.5" /> 재개</>}</Button>
-            <Button size="sm" variant="destructive" onClick={removeForm}><Trash2 className="h-3.5 w-3.5" /></Button>
+            <StatusBadge status={f.status} />
+            <Button size="sm" variant="outline" onClick={toggle}>{f.status === 'ACTIVE' ? <><Pause /> 일시중지</> : <><Play /> 재개</>}</Button>
+            <ConfirmButton size="icon-sm" variant="destructive" aria-label="폼 삭제" title="폼을 삭제할까요?" description="링크·이벤트·신청 데이터가 함께 삭제됩니다." onConfirm={removeForm}><Trash2 /></ConfirmButton>
           </div>
         )}
       />
-      {form?.campaign && <Link href={`/campaigns/${form.campaign.id}`} className="mb-4 inline-block text-sm text-gray-500 hover:underline">← {form.campaign.name}</Link>}
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        <Card>
-          <CardHeader><CardTitle>배포 링크 만들기</CardTitle><CardDescription>채널별 고유 URL. 채널명은 URL에 노출되지 않습니다.</CardDescription></CardHeader>
-          <CardContent>
-            <form onSubmit={createLink} className="flex flex-col gap-3">
-              <div>
-                <Label htmlFor="link-channel">채널</Label>
-                <Select value={channel} onValueChange={(v) => setChannel(v as Channel)}>
-                  <SelectTrigger id="link-channel"><SelectValue /></SelectTrigger>
-                  <SelectContent>{CHANNEL_OPTIONS.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}</SelectContent>
-                </Select>
-              </div>
-              {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
-              <Button type="submit"><Plus className="h-4 w-4" /> 링크 생성</Button>
-            </form>
-          </CardContent>
-        </Card>
+      <div className="grid gap-3 lg:grid-cols-3">
+        <Section title="배포 링크 만들기" desc="채널별 고유 URL. 채널명은 URL에 노출되지 않습니다.">
+          <form onSubmit={(e) => { e.preventDefault(); createLink.run(); }} className="flex flex-col gap-3">
+            <div>
+              <Label htmlFor="link-channel">채널</Label>
+              <Select value={channel} onValueChange={(v) => setChannel(v as Channel)}>
+                <SelectTrigger id="link-channel"><SelectValue /></SelectTrigger>
+                <SelectContent>{CHANNEL_OPTIONS.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+            <ErrorText>{createLink.error}</ErrorText>
+            <Button type="submit" disabled={createLink.busy}><Plus /> 링크 생성</Button>
+          </form>
+        </Section>
 
-        <Card className="lg:col-span-2">
-          <CardHeader><CardTitle>배포 링크</CardTitle></CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader><TableRow><TableHead>채널</TableHead><TableHead>URL</TableHead><TableHead>생성일</TableHead><TableHead /></TableRow></TableHeader>
-              <TableBody>
-                {links.length === 0 && <TableRow><TableCell colSpan={4} className="py-8 text-center text-gray-400">링크가 없습니다.</TableCell></TableRow>}
-                {links.map((l) => (
-                  <TableRow key={l.id}>
-                    <TableCell><ChannelBadge channel={l.channel} /></TableCell>
-                    <TableCell><code className="rounded bg-gray-100 px-1.5 py-0.5 text-xs">{l.url}</code></TableCell>
-                    <TableCell className="text-gray-500 whitespace-nowrap">{fmtDate(l.createdAt)}</TableCell>
-                    <TableCell className="text-right whitespace-nowrap">
-                      <Button size="sm" variant="ghost" onClick={() => copy(l)}><Copy className="h-3.5 w-3.5" /> {copied === l.id ? '복사됨' : '복사'}</Button>
-                      <a href={l.url} target="_blank" rel="noopener noreferrer"><Button size="sm" variant="ghost"><ExternalLink className="h-3.5 w-3.5" /></Button></a>
-                      <Button size="sm" variant="ghost" onClick={() => removeLink(l)}><Trash2 className="h-3.5 w-3.5" /></Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+        <Section title="배포 링크" desc="전 기간 단계 수. 복사해서 각 채널에 게시." className="lg:col-span-2">
+          <LinkTable rows={links.data ?? []} publicOrigin={publicOrigin} onDelete={removeLink} />
+        </Section>
 
-        <Card className="lg:col-span-3">
-          <CardHeader><CardTitle>신청 명단 <span className="text-gray-400 font-normal">({subs?.total ?? 0})</span></CardTitle><CardDescription>최근 50건. 전체는 CRM 명단 메뉴에서.</CardDescription></CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader><TableRow><TableHead>일시</TableHead><TableHead>채널</TableHead>{fieldKeys.map((k) => <TableHead key={k}>{k}</TableHead>)}</TableRow></TableHeader>
-              <TableBody>
-                {(subs?.items ?? []).length === 0 && <TableRow><TableCell colSpan={2 + fieldKeys.length} className="py-8 text-center text-gray-400">신청이 없습니다.</TableCell></TableRow>}
-                {subs?.items.map((s) => (
-                  <TableRow key={s.id}>
-                    <TableCell className="text-gray-500 whitespace-nowrap">{fmtDate(s.createdAt)}</TableCell>
-                    <TableCell>{s.link ? <ChannelBadge channel={s.link.channel} /> : <span className="text-xs text-gray-400">직접</span>}</TableCell>
-                    {fieldKeys.map((k) => <TableCell key={k} className="max-w-48 truncate">{Array.isArray(s.payload[k]) ? (s.payload[k] as string[]).join(', ') : s.payload[k] ?? ''}</TableCell>)}
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+        <Section title="신청 명단" desc="이 폼으로 들어온 신청. 행을 펼치면 방문자 여정." className="lg:col-span-3">
+          <SubmittedList formId={id} compact />
+        </Section>
       </div>
     </Shell>
   );

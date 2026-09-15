@@ -1,9 +1,6 @@
 import { Table, TableBody, TableCell, TableRow } from '@/components/ui/table';
-import { pct, fmtNum } from '@/lib/utils';
+import { pct, fmtNum, failureLabel } from '@/lib/format';
 import type { Failure, Quality } from '@/lib/api';
-
-const REASON: Record<string, string> = { network: '네트워크 오류', http: '서버 응답 오류', unknown: '기타' };
-const STATUS: Record<number, string> = { 400: '필드 검증 400', 403: '폼 일시중지 403', 404: '폼 없음 404', 429: '요청 과다 429' };
 
 /** 제출 실패 사유 표 */
 export function FailuresTable({ rows }: { rows: Failure[] }) {
@@ -13,7 +10,7 @@ export function FailuresTable({ rows }: { rows: Failure[] }) {
       <TableBody>
         {rows.map((f, i) => (
           <TableRow key={i}>
-            <TableCell>{f.status ? STATUS[f.status] ?? `${REASON[f.reason] ?? f.reason} ${f.status}` : REASON[f.reason] ?? f.reason}</TableCell>
+            <TableCell>{failureLabel(f.reason, f.status)}</TableCell>
             <TableCell className="text-right tabular-nums">{fmtNum(f.count)}</TableCell>
           </TableRow>
         ))}
