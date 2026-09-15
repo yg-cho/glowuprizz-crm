@@ -171,6 +171,21 @@ describe('Funnel stats (e2e)', () => {
     expect(v1.views).toBe(2);
   });
 
+  it('journey: 같은 밀리초 이벤트는 단계 순으로 정렬 (비콘이 제출 응답 뒤에 도착하는 경우)', async () => {
+    const t = at('2026-09-15', 18);
+    // 역순 삽입: SUCCESS → ATTEMPT → START
+    await ev(formA, igLink, 'v9', 'SUBMIT_SUCCESS', t);
+    await ev(formA, igLink, 'v9', 'SUBMIT_ATTEMPT', t);
+    await ev(formA, igLink, 'v9', 'FORM_START', t);
+    await ev(formA, igLink, 'v9', 'VIEW', at('2026-09-15', 17));
+    const sub = await prisma.submission.create({ data: { formId: formA, linkId: igLink, visitorId: 'v9', payload: {}, createdAt: t } });
+    const r = (await get(`/api/submissions/${sub.id}/journey`).expect(200)).body;
+    expect(r.events.map((e: { type: string }) => e.type)).toEqual(['VIEW', 'FORM_START', 'SUBMIT_ATTEMPT', 'SUBMIT_SUCCESS']);
+    const vis = (await get(`/api/stats/visitors?${qs({ stage: 'FORM_START', submitted: 'true' })}`).expect(200)).body;
+    const v9 = vis.items.find((i: { visitorId: string }) => i.visitorId === 'v9');
+    expect(v9.journey.map((e: { type: string }) => e.type)).toEqual(['VIEW', 'FORM_START', 'SUBMIT_ATTEMPT', 'SUBMIT_SUCCESS']);
+  });
+
   it('submissions/:id/journey: 신청 → 방문자 이벤트 타임라인, 소요 시간', async () => {
     const sub = await prisma.submission.findFirstOrThrow({ where: { visitorId: 'v1' } });
     const r = (await get(`/api/submissions/${sub.id}/journey`).expect(200)).body;
@@ -191,7 +206,7 @@ describe('Funnel stats (e2e)', () => {
 
   it('range 기본값 7d, all 은 기간 밖(9/1) 포함', async () => {
     const all = (await get(`/api/stats/funnel?range=all`).expect(200)).body;
-    expect(all.current.stages[0].visitors).toBe(6); // v0 포함
+    expect(all.current.stages[0].visitors).toBe(7); // v0, v9 포함
     expect(all.period).toEqual({ from: null, to: null });
     const def = (await get(`/api/stats/funnel`).expect(200)).body;
     expect(def.range).toBe('7d');
