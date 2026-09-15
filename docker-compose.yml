@@ -1,0 +1,70 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: glow
+      POSTGRES_PASSWORD: glow
+      POSTGRES_DB: glowuprizz
+    ports: ["5432:5432"]
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U glow -d glowuprizz"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  postgres-test:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: glow
+      POSTGRES_PASSWORD: glow
+      POSTGRES_DB: glowuprizz_test
+    ports: ["5433:5432"]
+    tmpfs: [/var/lib/postgresql/data]
+
+  api:
+    build: { context: ., dockerfile: docker/api.Dockerfile }
+    environment:
+      PORT: 3001
+      NODE_ENV: production
+      DATABASE_URL: postgresql://glow:glow@postgres:5432/glowuprizz
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-prod}
+      WEB_ORIGIN: http://localhost:3000
+      FORMS_PUBLIC_ORIGIN: ${FORMS_PUBLIC_ORIGIN:-http://127.0.0.1:3002}
+      SEED_OPERATOR_EMAIL: ${SEED_OPERATOR_EMAIL:-admin@glowuprizz.com}
+      SEED_OPERATOR_PASSWORD: ${SEED_OPERATOR_PASSWORD:-Password123!}
+    ports: ["3001:3001"]
+    depends_on:
+      postgres: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3001/docs"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+
+  forms:
+    build: { context: ., dockerfile: docker/forms.Dockerfile }
+    environment:
+      PORT: 3002
+      NODE_ENV: production
+      DATABASE_URL: postgresql://glow:glow@postgres:5432/glowuprizz
+      IP_HASH_SALT: ${IP_HASH_SALT:-change-me}
+    ports: ["3002:3002"]
+    depends_on:
+      api: { condition: service_healthy }
+
+  web:
+    build:
+      context: .
+      dockerfile: docker/web.Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:3001
+    environment:
+      PORT: 3000
+      API_INTERNAL_URL: http://api:3001
+    ports: ["3000:3000"]
+    depends_on:
+      api: { condition: service_healthy }
+
+volumes:
+  pgdata:
