@@ -49,6 +49,7 @@ services:
       NODE_ENV: production
       DATABASE_URL: postgresql://glow:glow@postgres:5432/glowuprizz
       IP_HASH_SALT: ${IP_HASH_SALT:-dev-salt-change-me-0123456789}
+      FORMS_DOCS: "1" # 로컬 평가용. 운영(Railway)에서는 미설정 → 공개 서버 Swagger 비활성
     ports: ["3002:3002"]
     depends_on:
       api: { condition: service_healthy }
