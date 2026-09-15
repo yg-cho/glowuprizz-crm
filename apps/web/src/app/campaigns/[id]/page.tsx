@@ -30,7 +30,7 @@ export default function CampaignDetailPage() {
     const [c, t, ch] = await Promise.all([
       api.get<Campaign>(`/campaigns/${id}`),
       api.get<Template[]>('/templates'),
-      api.get<ChannelStats[]>(`/stats/channels?campaignId=${id}`),
+      api.get<ChannelStats[]>(`/stats/channels?range=all&campaignId=${id}`),
     ]);
     setCampaign(c); setTemplates(t); setChannels(ch);
     if (!templateId && t[0]) setTemplateId(t[0].id);
@@ -109,10 +109,10 @@ export default function CampaignDetailPage() {
                 {channels.map((c) => (
                   <TableRow key={c.channel}>
                     <TableCell><ChannelBadge channel={c.channel} /></TableCell>
-                    <TableCell className="text-right tabular-nums">{c.visits}</TableCell>
-                    <TableCell className="text-right tabular-nums">{c.visitors}</TableCell>
-                    <TableCell className="text-right tabular-nums">{c.submissions}</TableCell>
-                    <TableCell className="text-right tabular-nums font-medium">{pct(c.conversionRate)}</TableCell>
+                    <TableCell className="text-right tabular-nums">{c.pageViews}</TableCell>
+                    <TableCell className="text-right tabular-nums">{c.VIEW}</TableCell>
+                    <TableCell className="text-right tabular-nums">{c.SUBMIT_SUCCESS}</TableCell>
+                    <TableCell className="text-right tabular-nums font-medium">{pct(c.clickToSubmit)}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
