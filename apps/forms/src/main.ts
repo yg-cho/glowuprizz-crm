@@ -1,10 +1,9 @@
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe } from '@nestjs/common';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
-import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
+import { setupApp } from './app.setup';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
@@ -12,9 +11,7 @@ async function bootstrap() {
   app.enableShutdownHooks();
   // 기본 보안 헤더. CSP 는 HTML 라우트가 폼별로 직접 설정하므로 여기서는 끈다.
   app.use(helmet({ contentSecurityPolicy: false, crossOriginEmbedderPolicy: false }));
-  app.use(cookieParser());
-  // CORS 없음: 공개 폼과 제출 API 가 같은 origin. 다른 origin 의 fetch 는 브라우저가 차단.
-  app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
+  setupApp(app);
 
   // 공개 서버의 API 문서는 운영에서 노출하지 않는다
   if (process.env.NODE_ENV !== 'production' || process.env.FORMS_DOCS === '1') {

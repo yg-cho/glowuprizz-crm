@@ -6,7 +6,8 @@ export interface ResolvedPeriod { range: Range; current: Period; previous: Perio
 
 export const DAY_MS = 86_400_000;
 const DAY = DAY_MS;
-const KST_OFFSET = 9 * 3_600_000;
+export const KST_OFFSET_MS = 9 * 3_600_000;
+const KST_OFFSET = KST_OFFSET_MS;
 
 /** 날짜만 온 값(YYYY-MM-DD)은 KST 자정으로, 시각이 있으면 그대로 */
 function parseBoundary(v: string): Date {

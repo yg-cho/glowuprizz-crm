@@ -35,6 +35,14 @@ describe('Operator funnel (e2e)', () => {
       const res = await upload('<html><body><h1>no form</h1></body></html>').expect(400);
       expect(res.body.message).toMatch(/<form>/);
     });
+    it('실패: 폼이 참조 중인 템플릿 삭제는 409 (FK Restrict → PrismaExceptionFilter)', async () => {
+      const tpl = (await upload().expect(201)).body;
+      const camp = (await request(app.getHttpServer()).post('/api/campaigns').set('Cookie', cookie).send({ name: 'c' }).expect(201)).body;
+      await request(app.getHttpServer()).post('/api/forms').set('Cookie', cookie).send({ campaignId: camp.id, templateId: tpl.id, name: 'f' }).expect(201);
+      await request(app.getHttpServer()).delete(`/api/templates/${tpl.id}`).set('Cookie', cookie).expect(409);
+      expect(await prisma.htmlTemplate.count({ where: { id: tpl.id } })).toBe(1);
+    });
+
     it('실패: 파일 누락', async () => {
       await request(app.getHttpServer()).post('/api/templates').set('Cookie', cookie).field('name', 'x').expect(400);
     });
@@ -138,6 +146,8 @@ describe('Operator funnel (e2e)', () => {
       // 화이트리스트 외 필드는 거부
       await request(app.getHttpServer()).post('/api/campaigns').set('Cookie', cookie)
         .send({ name: 'c2', operatorId: 'hijack' }).expect(400);
+      // campaignId 쿼리는 UUID 검증
+      await request(app.getHttpServer()).get('/api/forms?campaignId=not-uuid').set('Cookie', cookie).expect(400);
     });
 
     it('실패: 다른 운영자의 리소스는 보이지도, 쓰이지도 않음 (IDOR)', async () => {

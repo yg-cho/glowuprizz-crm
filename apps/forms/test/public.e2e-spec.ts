@@ -1,9 +1,9 @@
-import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
-import cookieParser from 'cookie-parser';
 import request from 'supertest';
 import { PrismaClient } from '@glowuprizz/db';
 import { AppModule } from '../src/app.module';
+import { setupApp } from '../src/app.setup';
 
 const prisma = new PrismaClient();
 
@@ -20,9 +20,7 @@ describe('Public forms (e2e)', () => {
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
-    app = moduleRef.createNestApplication();
-    app.use(cookieParser());
-    app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
+    app = setupApp(moduleRef.createNestApplication());
     await app.init();
   });
   afterAll(async () => { await app.close(); await prisma.$disconnect(); });

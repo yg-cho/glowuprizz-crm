@@ -41,6 +41,12 @@ describe('Auth (e2e)', () => {
     await request(app.getHttpServer()).get('/api/auth/me').set('Cookie', 'gu_admin=eyJhbGciOiJIUzI1NiJ9.fake.sig').expect(401);
   });
 
+  it('운영자가 삭제되면 서명이 유효한 토큰도 401', async () => {
+    const cookie = await login(app);
+    await prisma.operator.deleteMany({ where: { email: 'op@test.com' } });
+    await request(app.getHttpServer()).get('/api/auth/me').set('Cookie', cookie).expect(401);
+  });
+
   it('로그인 후 /me, 로그아웃 후 쿠키 제거', async () => {
     const cookie = await login(app);
     await request(app.getHttpServer()).get('/api/auth/me').set('Cookie', cookie).expect(200);

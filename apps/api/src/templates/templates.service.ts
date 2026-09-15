@@ -1,4 +1,4 @@
-import { ConflictException, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { OwnershipService } from '../common/ownership.service';
 
@@ -27,10 +27,9 @@ export class TemplatesService {
     return this.own.template(operatorId, id);
   }
 
+  /** 폼이 참조 중이면 FK(Restrict) 위반 → 409 (PrismaExceptionFilter) */
   async remove(operatorId: string, id: string) {
     await this.own.template(operatorId, id);
-    const inUse = await this.prisma.form.count({ where: { templateId: id } });
-    if (inUse > 0) throw new ConflictException('template is used by forms; delete forms first');
     await this.prisma.htmlTemplate.delete({ where: { id } });
   }
 }

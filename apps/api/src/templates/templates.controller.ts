@@ -6,6 +6,8 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiBody, ApiConsumes, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { memoryStorage } from 'multer';
 import { MAX_HTML_BYTES } from '@glowuprizz/shared';
+
+const MAX_NAME_LEN = 120;
 import { CurrentOperator, OperatorPrincipal } from '../common/current-operator.decorator';
 import { OperatorApi } from '../common/operator-api.decorator';
 import { TemplatesService } from './templates.service';
@@ -33,14 +35,15 @@ export class TemplatesController {
     },
   })
   @ApiResponse({ status: 201, description: '등록됨' })
-  @ApiResponse({ status: 400, description: '확장자/크기/폼 요소 검증 실패' })
+  @ApiResponse({ status: 400, description: '확장자/폼 요소 검증 실패' })
+  @ApiResponse({ status: 413, description: '512KB 초과' })
   async upload(
     @CurrentOperator() op: OperatorPrincipal,
     @UploadedFile() file: Express.Multer.File,
     @Body() dto: CreateTemplateDto,
   ) {
     const html = validateHtmlUpload(file);
-    const name = dto.name?.trim() || file.originalname.replace(/\.html?$/i, '');
+    const name = (dto.name?.trim() || file.originalname.replace(/\.html?$/i, '')).slice(0, MAX_NAME_LEN);
     return this.templates.create(op.id, name, html);
   }
 

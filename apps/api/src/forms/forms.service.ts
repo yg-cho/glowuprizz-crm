@@ -1,4 +1,4 @@
-import { ConflictException, Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { customAlphabet } from 'nanoid';
 import { PrismaService } from '../prisma/prisma.service';
 import { OwnershipService } from '../common/ownership.service';
@@ -18,9 +18,8 @@ export class FormsService {
 
   async create(operatorId: string, dto: CreateFormDto) {
     await Promise.all([this.own.campaign(operatorId, dto.campaignId), this.own.template(operatorId, dto.templateId)]);
-    const slug = dto.slug ?? slugId();
-    if (await this.prisma.form.findUnique({ where: { slug } })) throw new ConflictException('slug already in use');
-    return this.prisma.form.create({ data: { campaignId: dto.campaignId, templateId: dto.templateId, name: dto.name, slug } });
+    // slug 유니크는 DB 제약에 맡긴다 (P2002 → 409, PrismaExceptionFilter)
+    return this.prisma.form.create({ data: { campaignId: dto.campaignId, templateId: dto.templateId, name: dto.name, slug: dto.slug ?? slugId() } });
   }
 
   list(operatorId: string, campaignId?: string) {
@@ -32,8 +31,9 @@ export class FormsService {
   }
 
   async get(operatorId: string, id: string) {
-    await this.own.form(operatorId, id);
-    return this.prisma.form.findUniqueOrThrow({ where: { id }, include: { ...FORM_INCLUDE, links: { orderBy: { createdAt: 'asc' } } } });
+    const f = await this.prisma.form.findFirst({ where: { id, campaign: { operatorId } }, include: { ...FORM_INCLUDE, links: { orderBy: { createdAt: 'asc' } } } });
+    if (!f) throw new NotFoundException('form not found');
+    return f;
   }
 
   async update(operatorId: string, id: string, dto: UpdateFormDto) {

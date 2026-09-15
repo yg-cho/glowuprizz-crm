@@ -21,7 +21,7 @@ export class FormsController {
   @Get()
   @ApiQuery({ name: 'campaignId', required: false })
   @ApiOperation({ summary: '폼 목록' })
-  list(@CurrentOperator() op: OperatorPrincipal, @Query('campaignId') campaignId?: string) {
+  list(@CurrentOperator() op: OperatorPrincipal, @Query('campaignId', new ParseUUIDPipe({ optional: true })) campaignId?: string) {
     return this.forms.list(op.id, campaignId);
   }
 

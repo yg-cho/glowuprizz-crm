@@ -1,4 +1,5 @@
 import { STAGES, STAGE_LABELS, Stage, StageCounts, FunnelStage } from '@glowuprizz/shared';
+import { KST_OFFSET_MS } from './period';
 
 /** n/d 를 소수 4자리 비율로. 분모 0 이면 0. */
 export const rate = (n: number, d: number) => (d === 0 ? 0 : Math.round((n / d) * 10000) / 10000);
@@ -53,4 +54,4 @@ export function funnelSnapshot(g: StageGroup) {
 }
 
 /** UTC Date → KST 날짜 문자열 (YYYY-MM-DD) */
-export const kstDay = (d: Date) => new Date(d.getTime() + 9 * 3_600_000).toISOString().slice(0, 10);
+export const kstDay = (d: Date) => new Date(d.getTime() + KST_OFFSET_MS).toISOString().slice(0, 10);

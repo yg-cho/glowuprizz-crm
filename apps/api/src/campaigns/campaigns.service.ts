@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { OwnershipService } from '../common/ownership.service';
 import { CreateCampaignDto } from './dto/create-campaign.dto';
@@ -20,11 +20,12 @@ export class CampaignsService {
   }
 
   async get(operatorId: string, id: string) {
-    await this.own.campaign(operatorId, id);
-    return this.prisma.campaign.findUniqueOrThrow({
-      where: { id },
+    const c = await this.prisma.campaign.findFirst({
+      where: { id, operatorId },
       include: { forms: { include: { template: { select: { id: true, name: true } }, _count: { select: { links: true, submissions: true } } } } },
     });
+    if (!c) throw new NotFoundException('campaign not found');
+    return c;
   }
 
   async remove(operatorId: string, id: string) {

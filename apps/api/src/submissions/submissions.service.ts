@@ -3,7 +3,7 @@ import { Channel } from '@glowuprizz/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { OwnershipService } from '../common/ownership.service';
 import { normalizePage } from '../common/pagination';
-import { loadJourney } from '../stats/journey';
+import { loadJourney } from '../common/journey';
 
 export interface SubmissionListQuery { formId?: string; campaignId?: string; channel?: Channel; page?: number; pageSize?: number }
 
