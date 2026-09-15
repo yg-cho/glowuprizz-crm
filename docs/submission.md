@@ -20,13 +20,13 @@
 | README | 루트 — 실행 방법 · 테스트 방법 |
 | ADR | `docs/adr/` (0001~0006, 인덱스 `docs/adr/README.md`) |
 
-## 검증 결과 (2026-09-14)
+## 검증 결과 (2026-09-16)
 
 | 검증 | 결과 |
 |---|---|
-| 관리자 API e2e (Jest, 실제 Postgres) | 27/27 (인증·도메인·퍼널 집계) |
+| 관리자 API e2e (Jest, 실제 Postgres) | 28/28 (인증·도메인·퍼널 집계) + 단위 11/11 (metrics·period·journey) |
 | 공개 폼 e2e (Jest, 실제 Postgres) | 14/14 (렌더·이벤트 수집·제출) |
-| 브라우저 e2e (Playwright) — docker compose | 5/5 (퍼널 화면 3종 방문자 시나리오 포함) |
+| 브라우저 e2e (Playwright) — docker compose · Railway 운영 | 5/5 · 5/5 (퍼널 화면 3종 방문자 시나리오 포함) |
 | `docker compose up -d --build` 전체 스택 | 로그인 → 업로드 → 링크 → 방문 → 제출 → 성과 정상 |
 
 ## 데모 시나리오 (3분)
