@@ -34,7 +34,7 @@ describe('Auth (e2e)', () => {
     await request(app.getHttpServer()).get('/api/templates').expect(401);
     await request(app.getHttpServer()).get('/api/campaigns').expect(401);
     await request(app.getHttpServer()).get('/api/submissions').expect(401);
-    await request(app.getHttpServer()).get('/api/stats/campaigns').expect(401);
+    await request(app.getHttpServer()).get('/api/stats/funnel').expect(401);
   });
 
   it('위조 쿠키는 401', async () => {

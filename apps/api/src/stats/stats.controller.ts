@@ -15,12 +15,6 @@ import { StatsQueryDto, VisitorsQueryDto } from './dto/stats-query.dto';
 export class StatsController {
   constructor(private readonly stats: StatsService) {}
 
-  @Get('overview')
-  @ApiOperation({ summary: '전체 합계(전 기간): 방문/방문자/신청/전환율/캠페인수/폼수' })
-  overview(@CurrentOperator() op: OperatorPrincipal) {
-    return this.stats.overview(op.id);
-  }
-
   @Get('funnel')
   @ApiOperation({ summary: '5단계 퍼널: 링크 클릭 → 폼 도달 → 작성 시작 → 제출 시도 → 신청 완료. 단계 전환율·누적 전환율·이탈, 최대 이탈 구간, compare 시 직전 기간' })
   funnel(@CurrentOperator() op: OperatorPrincipal, @Query() q: StatsQueryDto) {

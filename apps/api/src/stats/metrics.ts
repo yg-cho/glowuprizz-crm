@@ -3,7 +3,7 @@ import { STAGES, STAGE_LABELS, Stage, StageCounts, FunnelStage } from '@glowupri
 /** n/d 를 소수 4자리 비율로. 분모 0 이면 0. */
 export const rate = (n: number, d: number) => (d === 0 ? 0 : Math.round((n / d) * 10000) / 10000);
 export const num = (v: unknown) => Number(v ?? 0);
-export const emptyStages = (): StageCounts => ({ VIEW: 0, FORM_VIEW: 0, FORM_START: 0, SUBMIT_ATTEMPT: 0, SUBMIT_SUCCESS: 0 });
+const emptyStages = (): StageCounts => ({ VIEW: 0, FORM_VIEW: 0, FORM_START: 0, SUBMIT_ATTEMPT: 0, SUBMIT_SUCCESS: 0 });
 
 /** 한 그룹(전체/채널/캠페인/…)의 단계별 집계 결과 */
 export interface StageGroup {

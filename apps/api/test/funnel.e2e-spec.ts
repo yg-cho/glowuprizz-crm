@@ -98,9 +98,6 @@ describe('Operator funnel (e2e)', () => {
       const filtered = (await request(app.getHttpServer()).get(`/api/stats/channels?range=all&campaignId=${camp.id}`).set('Cookie', cookie).expect(200)).body;
       expect(filtered).toEqual(byChannel);
 
-      // overview
-      const ov = (await request(app.getHttpServer()).get('/api/stats/overview').set('Cookie', cookie).expect(200)).body;
-      expect(ov).toMatchObject({ visits: 5, visitors: 4, submissions: 2, campaigns: 1, forms: 1, conversionRate: 0.5 });
 
       // CRM 명단
       const subs = (await request(app.getHttpServer()).get(`/api/submissions?campaignId=${camp.id}`).set('Cookie', cookie).expect(200)).body;
