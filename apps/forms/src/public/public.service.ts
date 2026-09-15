@@ -1,9 +1,19 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { EventType, Prisma } from '@glowuprizz/db';
+import { ClientEventType } from './dto/event.dto';
 import { createHash } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 
 const MAX_FIELDS = 50;
 const MAX_VALUE_LEN = 2000;
+const MAX_META_BYTES = 1024;
+
+const CLIENT_EVENT_MAP: Record<ClientEventType, EventType> = {
+  form_view: 'FORM_VIEW',
+  form_start: 'FORM_START',
+  submit_attempt: 'SUBMIT_ATTEMPT',
+  submit_error: 'SUBMIT_ERROR',
+};
 
 @Injectable()
 export class PublicService {
@@ -47,6 +57,27 @@ export class PublicService {
     });
   }
 
+  /** 링크 코드가 이 폼에 속할 때만 채널 귀속. 다른 폼 코드는 무시(오염 방지). */
+  private async resolveLinkId(formId: string, linkCode: string | null | undefined): Promise<string | null> {
+    if (!linkCode) return null;
+    const link = await this.prisma.distributionLink.findUnique({ where: { code: linkCode } });
+    return link && link.formId === formId ? link.id : null;
+  }
+
+  /** 주입 스크립트가 보내는 퍼널 이벤트. 방문자 쿠키 없으면 집계 불가 → 무시. */
+  async recordClientEvent(slug: string, dto: { linkCode?: string | null; type: ClientEventType; meta?: Record<string, unknown> }, visitorId: string | null, ip?: string, userAgent?: string) {
+    if (!visitorId) return;
+    const form = await this.resolveForm(slug);
+    const meta = dto.meta ?? {};
+    if (Buffer.byteLength(JSON.stringify(meta), 'utf8') > MAX_META_BYTES) {
+      throw new BadRequestException(`meta too large (max ${MAX_META_BYTES} bytes)`);
+    }
+    const linkId = await this.resolveLinkId(form.id, dto.linkCode);
+    await this.prisma.event.create({
+      data: { formId: form.id, linkId, visitorId, type: CLIENT_EVENT_MAP[dto.type], meta: meta as Prisma.InputJsonValue, ipHash: this.hashIp(ip), userAgent: userAgent?.slice(0, 500) },
+    });
+  }
+
   async submit(slug: string, linkCode: string | null | undefined, fields: Record<string, unknown>, visitorId: string | null, ip?: string) {
     const form = await this.resolveForm(slug);
 
@@ -61,12 +92,7 @@ export class PublicService {
       else throw new BadRequestException(`field "${k}" must be string or string[]`);
     }
 
-    let linkId: string | null = null;
-    if (linkCode) {
-      // 링크가 이 폼에 속할 때만 채널 귀속. 다른 폼 코드는 무시(오염 방지).
-      const link = await this.prisma.distributionLink.findUnique({ where: { code: linkCode } });
-      if (link && link.formId === form.id) linkId = link.id;
-    }
+    const linkId = await this.resolveLinkId(form.id, linkCode);
 
     const ipHash = this.hashIp(ip);
     // 신청 저장 + SUBMIT_SUCCESS 이벤트를 한 트랜잭션으로 (퍼널 마지막 단계)
