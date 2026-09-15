@@ -2,7 +2,7 @@ import { Body, Controller, Get, HttpCode, Post, Req, Res, UseGuards } from '@nes
 import { ApiCookieAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Request, Response } from 'express';
 import { Throttle } from '@nestjs/throttler';
-import { AUTH_COOKIE, isSecureRequest } from '@glowuprizz/shared';
+import { AUTH_COOKIE, httpOnlyCookie } from '@glowuprizz/shared';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { JwtAuthGuard } from './jwt-auth.guard';
@@ -23,13 +23,7 @@ export class AuthController {
   @ApiResponse({ status: 401, description: '이메일 또는 비밀번호 불일치' })
   async login(@Body() dto: LoginDto, @Req() req: Request, @Res({ passthrough: true }) res: Response) {
     const { token, operator } = await this.auth.login(dto.email, dto.password);
-    res.cookie(AUTH_COOKIE, token, {
-      httpOnly: true,
-      sameSite: 'lax',
-      secure: isSecureRequest(req),
-      maxAge: COOKIE_MAX_AGE_MS,
-      path: '/',
-    });
+    res.cookie(AUTH_COOKIE, token, httpOnlyCookie(req, COOKIE_MAX_AGE_MS));
     return { operator };
   }
 
