@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Header, HttpCode, Param, Post, Req, Res } from '@nestjs/common';
+import { Body, Controller, Get, Header, HttpCode, Logger, Param, Post, Req, Res } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Request, Response } from 'express';
 import { Throttle } from '@nestjs/throttler';
@@ -18,6 +18,7 @@ const SECURITY_HEADERS: Record<string, string> = {
 @ApiTags('public')
 @Controller()
 export class PublicController {
+  private readonly log = new Logger(PublicController.name);
   constructor(private readonly svc: PublicService) {}
 
   /**
@@ -26,7 +27,10 @@ export class PublicController {
    */
   private async serve(req: Request, res: Response, form: { id: string; slug: string; template: { html: string } }, link: { id: string; code: string } | null) {
     const visitorId = ensureVisitorId(req, res);
-    await this.svc.recordView(form.id, link?.id ?? null, visitorId, requestContext(req, visitorId));
+    // 링크 미리보기 크롤러의 HEAD 는 클릭이 아니다. 기록 실패는 랜딩을 막지 않는다(fail-open).
+    if (req.method !== 'HEAD') {
+      await this.svc.recordView(form.id, link?.id ?? null, visitorId, requestContext(req, visitorId)).catch((e) => this.log.error(`VIEW 기록 실패: ${e}`));
+    }
     const html = injectScript(form.template.html, buildInjectScript(form.slug, link?.code ?? null));
     res.setHeader('Content-Security-Policy', buildCsp());
     for (const [k, v] of Object.entries(SECURITY_HEADERS)) res.setHeader(k, v);
