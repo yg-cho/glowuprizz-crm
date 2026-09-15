@@ -68,7 +68,7 @@ describe('Operator funnel (e2e)', () => {
       expect(listed).toHaveLength(4);
 
       // 방문/신청 데이터 (forms 앱이 기록하는 형태와 동일)
-      const v = (vid: string, linkId: string | null) => prisma.visit.create({ data: { formId: form.id, linkId, visitorId: vid } });
+      const v = (vid: string, linkId: string | null) => prisma.event.create({ data: { formId: form.id, linkId, visitorId: vid, type: 'VIEW' } });
       await v('v1', links.INSTAGRAM.id); await v('v1', links.INSTAGRAM.id); // 같은 방문자 2회
       await v('v2', links.INSTAGRAM.id);
       await v('v3', links.YOUTUBE.id);

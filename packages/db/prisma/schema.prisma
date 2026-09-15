@@ -69,7 +69,7 @@ model Form {
   campaign    Campaign           @relation(fields: [campaignId], references: [id], onDelete: Cascade)
   template    HtmlTemplate       @relation(fields: [templateId], references: [id], onDelete: Restrict)
   links       DistributionLink[]
-  visits      Visit[]
+  events      Event[]
   submissions Submission[]
 
   @@index([campaignId])
@@ -92,30 +92,43 @@ model DistributionLink {
   createdAt DateTime @default(now())
 
   form        Form         @relation(fields: [formId], references: [id], onDelete: Cascade)
-  visits      Visit[]
+  events      Event[]
   submissions Submission[]
 
   @@index([formId])
   @@map("distribution_links")
 }
 
-/// 페이지뷰 1건. visitorId 는 익명 쿠키.
-model Visit {
-  id        String   @id @default(uuid())
+/// 퍼널 이벤트. 단계 = 해당 type 을 1회 이상 낸 고유 visitorId 수 (ADR-0007).
+/// VIEW·SUBMIT_SUCCESS 는 서버가, 나머지는 공개 폼의 주입 스크립트가 기록한다.
+enum EventType {
+  VIEW            // GET /l/:code 200 (링크 클릭)
+  FORM_VIEW       // 주입 스크립트 실행 + <form> 발견 (폼 도달)
+  FORM_START      // 첫 입력 (작성 시작)
+  SUBMIT_ATTEMPT  // submit 이벤트 (제출 시도)
+  SUBMIT_ERROR    // 제출 실패 (meta.reason / meta.status)
+  SUBMIT_SUCCESS  // POST /f/:slug/submissions 201 (신청 완료)
+}
+
+model Event {
+  id        String    @id @default(uuid())
   formId    String
   linkId    String?
   visitorId String
+  type      EventType
+  meta      Json?
   ipHash    String?
   userAgent String?
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
 
   form Form              @relation(fields: [formId], references: [id], onDelete: Cascade)
   link DistributionLink? @relation(fields: [linkId], references: [id], onDelete: SetNull)
 
-  @@index([formId, createdAt])
-  @@index([linkId])
+  @@index([formId, type, createdAt])
   @@index([formId, visitorId])
-  @@map("visits")
+  @@index([visitorId, createdAt])
+  @@index([linkId])
+  @@map("events")
 }
 
 /// 신청 1건 = CRM 명단 행. payload 는 폼 필드 전체 (name/value).
