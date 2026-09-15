@@ -47,12 +47,12 @@ test.describe('브라우저 퍼널', () => {
     await expect(page.locator('[data-gu-success]')).toHaveText(/신청이 완료/);
 
     // 운영자 API 에 반영
-    const stats = await (await ctx.get('/api/stats/campaigns')).json();
+    const stats = await (await ctx.get('/api/stats/campaigns?range=all')).json();
     const mine = stats.find((s: { campaignId: string }) => s.campaignId === camp.id);
-    expect(mine).toMatchObject({ visits: 1, visitors: 1, submissions: 1, conversionRate: 1 });
+    expect(mine).toMatchObject({ pageViews: 1, VIEW: 1, FORM_VIEW: 1, FORM_START: 1, SUBMIT_ATTEMPT: 1, SUBMIT_SUCCESS: 1, conversionRate: 1 });
 
-    const ch = await (await ctx.get(`/api/stats/channels?campaignId=${camp.id}`)).json();
-    expect(ch.find((c: { channel: string }) => c.channel === 'INSTAGRAM')).toMatchObject({ visits: 1, submissions: 1 });
+    const ch = await (await ctx.get(`/api/stats/channels?range=all&campaignId=${camp.id}`)).json();
+    expect(ch.find((c: { channel: string }) => c.channel === 'INSTAGRAM')).toMatchObject({ VIEW: 1, SUBMIT_SUCCESS: 1, clickToSubmit: 1 });
 
     const subs = await (await ctx.get(`/api/submissions?formId=${form.id}`)).json();
     expect(subs.total).toBe(1);
