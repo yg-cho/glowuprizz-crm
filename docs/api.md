@@ -35,6 +35,11 @@
 
 ---
 
+## 1-1. 설정 `GET /api/config`
+관리자 화면용 서버 설정(비밀값 없음). `{ "formsPublicOrigin": "https://forms-…" }`
+
+---
+
 ## 2. HTML 템플릿 `/api/templates`
 
 ### POST `/api/templates` — `multipart/form-data`
