@@ -243,28 +243,29 @@ X-Frame-Options: DENY
 Cache-Control: no-store
 Set-Cookie: gu_vid=<uuid>; HttpOnly; SameSite=Lax; Max-Age=31536000
 ```
-- 404 코드 없음 · 403 폼 `PAUSED` (둘 다 방문 기록 안 함)
+- 404 코드 없음 · 403 폼 `PAUSED` — 방문자용 안내 HTML 응답 (둘 다 방문 기록 안 함). `HEAD` 는 렌더하지만 기록하지 않음.
+- 렌더 GET 은 분당 300회, `/healthz` 는 제한 없음.
 
 ### GET `/f/:slug`
 채널 없는 직접 접근. 동작 동일, `linkId = null` 로 기록.
 
 ### POST `/f/:slug/submissions`
-주입 스크립트가 호출. 페이지의 첫 `<form>` 필드를 JSON 으로 전송.
+주입 스크립트가 호출. 제출된 `<form>` 의 필드를 JSON 으로 전송. **`X-GU-Token` 헤더 필수** — 렌더 시 스크립트에 주입된 값으로, 이 `slug` 와 방문자 쿠키(`gu_vid`) 에 HMAC 으로 묶여 있다. 다른 폼 페이지의 토큰이나 위조 쿠키는 403.
 ```json
 { "linkCode": "htuqbxbe", "fields": { "name": "홍길동", "phone": "010-1234-5678", "tags": ["a", "b"] } }
 ```
 - `linkCode` 선택. 이 폼에 속한 코드일 때만 채널 귀속, 아니면 무시.
-- `fields`: 1~50개, 값은 string 또는 string[], 각 2000자로 절단.
+- `fields`: 1~50개, 키는 `^[\w.\-\[\]]{1,100}$`, 값은 string 또는 string[], 각 2000자로 절단.
 - → 201 `{ "id": "uuid", "createdAt": "..." }`
-- 400 필드 비었거나 형식 오류 · 403 `PAUSED` · 404 폼 없음 · 429 분당 20회 초과
+- 400 필드 비었거나 형식 오류 · 403 토큰 불일치 또는 `PAUSED` · 404 폼 없음 · 429 분당 20회 초과
 
 ### POST `/f/:slug/events`
-주입 스크립트가 `navigator.sendBeacon` 으로 호출. 방문자 쿠키(`gu_vid`) 없으면 204 로 받되 기록하지 않음.
+주입 스크립트가 `fetch(keepalive)` 로 호출. **`X-GU-Token` 헤더 필수**(위와 동일 규칙). 토큰·쿠키 불일치는 403.
 ```json
 { "linkCode": "htuqbxbe", "type": "form_start", "meta": { "field": "phone" } }
 ```
 - `type`: `form_view` | `form_start` | `submit_attempt` | `submit_error` (서버 전용 `view`/`submit_success` 는 400)
-- `meta`: 객체, JSON 1KB 이하. `form_view {hasForm, fields}`, `form_start {field}`, `submit_attempt {fields}`, `submit_error {reason: "http"|"network", status?}`
-- → 204 · 400 검증 실패 · 403 `PAUSED` · 404 폼 없음 · 429 분당 120회 초과
+- `meta`: 객체, JSON 1KB 이하. 타입별 허용 키만 저장(나머지 버림): `form_view {fields:int}`, `form_start {field:string≤100}`, `submit_attempt {fields:int}`, `submit_error {reason:"http"|"network", status:int}`
+- → 204 · 400 검증 실패 · 403 토큰 불일치 또는 `PAUSED` · 404 폼 없음 · 429 분당 120회 초과
 
 ### GET `/healthz` → `{ "ok": true }`

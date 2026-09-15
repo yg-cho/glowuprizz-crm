@@ -1,7 +1,8 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { EventType, Prisma } from '@glowuprizz/db';
-import { CLIENT_EVENT_MAP } from '@glowuprizz/shared';
+import { CLIENT_EVENT_MAP, ClientEventType } from '@glowuprizz/shared';
+import { FormToken } from './form-token';
 import { createHash } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { EventDto } from './dto/event.dto';
@@ -12,15 +13,23 @@ const MAX_FIELDS = 50;
 const MAX_VALUE_LEN = 2000;
 const MAX_META_BYTES = 1024;
 const MAX_UA_LEN = 500;
+const MIN_SALT_LEN = 16;
+const FIELD_KEY = /^[\w.\-\[\]]{1,100}$/;
+const MAX_META_STR = 100;
 
 type Payload = Record<string, string | string[]>;
 
 @Injectable()
 export class PublicService {
   private readonly ipSalt: string;
+  readonly token: FormToken;
 
   constructor(private readonly prisma: PrismaService, config: ConfigService) {
-    this.ipSalt = config.get<string>('IP_HASH_SALT', 'salt');
+    // 기본값으로 조용히 기동하면 IP 해시가 전수 역산되므로 fail-fast
+    const salt = config.get<string>('IP_HASH_SALT', '');
+    if (salt.length < MIN_SALT_LEN) throw new Error(`IP_HASH_SALT 은 ${MIN_SALT_LEN}자 이상이어야 합니다`);
+    this.ipSalt = salt;
+    this.token = new FormToken(createHash('sha256').update(`form-token:${salt}`).digest('hex'));
   }
 
   /** IP 원문은 저장하지 않는다. salted sha256 앞 32자. */
@@ -65,44 +74,61 @@ export class PublicService {
     return this.prisma.event.create({ data: this.eventData(formId, linkId, visitorId, 'VIEW', ctx) });
   }
 
-  /** 주입 스크립트가 보내는 퍼널 이벤트. 방문자 쿠키 없으면 집계 불가 → 무시. */
-  async recordClientEvent(slug: string, dto: EventDto, ctx: RequestContext) {
-    if (!ctx.visitorId) return;
-    const form = await this.resolveForm(slug);
-    const meta = (dto.meta ?? {}) as Prisma.InputJsonValue;
-    if (Buffer.byteLength(JSON.stringify(meta), 'utf8') > MAX_META_BYTES) {
-      throw new BadRequestException(`meta too large (max ${MAX_META_BYTES} bytes)`);
-    }
-    const linkId = await this.resolveLinkId(form.id, dto.linkCode);
-    await this.prisma.event.create({ data: this.eventData(form.id, linkId, ctx.visitorId, CLIENT_EVENT_MAP[dto.type], ctx, meta) });
+  /** 렌더된 페이지가 보낸 요청인지 확인: 쿠키의 방문자 + slug 에 바인딩된 토큰 */
+  private assertToken(slug: string, ctx: RequestContext, token?: string): string {
+    if (!ctx.visitorId || !this.token.verify(slug, ctx.visitorId, token)) throw new ForbiddenException('invalid form token');
+    return ctx.visitorId;
   }
 
-  /** 신청 저장 + SUBMIT_SUCCESS 이벤트 (한 트랜잭션) */
-  async submit(slug: string, dto: SubmitDto, ctx: RequestContext) {
+  /** 주입 스크립트가 보내는 퍼널 이벤트. 토큰으로 slug·방문자 검증. */
+  async recordClientEvent(slug: string, dto: EventDto, ctx: RequestContext, token?: string) {
+    const raw = dto.meta ?? {};
+    if (Buffer.byteLength(JSON.stringify(raw), 'utf8') > MAX_META_BYTES) throw new BadRequestException(`meta too large (max ${MAX_META_BYTES} bytes)`);
+    const visitorId = this.assertToken(slug, ctx, token);
     const form = await this.resolveForm(slug);
+    const linkId = await this.resolveLinkId(form.id, dto.linkCode);
+    const meta = this.normalizeMeta(dto.type, raw);
+    await this.prisma.event.create({ data: this.eventData(form.id, linkId, visitorId, CLIENT_EVENT_MAP[dto.type], ctx, meta) });
+  }
+
+  /** 이벤트 타입별 허용 키만 남기고 타입을 강제한다. 모르는 키는 버림. */
+  private normalizeMeta(type: ClientEventType, raw: Record<string, unknown>): Prisma.InputJsonValue {
+    const str = (v: unknown) => (typeof v === 'string' && v.length > 0 ? v.slice(0, MAX_META_STR) : null);
+    const int = (v: unknown) => (typeof v === 'number' && Number.isInteger(v) && v >= 0 ? v : null);
+    switch (type) {
+      case 'form_view': return { fields: int(raw.fields) };
+      case 'form_start': return { field: str(raw.field) };
+      case 'submit_attempt': return { fields: int(raw.fields) };
+      case 'submit_error': return { reason: raw.reason === 'network' ? 'network' : 'http', status: int(raw.status) };
+    }
+  }
+
+  /** 신청 저장 + SUBMIT_SUCCESS 이벤트 (한 트랜잭션). 토큰으로 slug·방문자 검증. */
+  async submit(slug: string, dto: SubmitDto, ctx: RequestContext, token?: string) {
     const payload = this.sanitizePayload(dto.fields);
+    const visitorId = this.assertToken(slug, ctx, token);
+    const form = await this.resolveForm(slug);
     const linkId = await this.resolveLinkId(form.id, dto.linkCode);
     const ipHash = this.hashIp(ctx.ip);
 
     return this.prisma.$transaction(async (tx) => {
       const s = await tx.submission.create({
-        data: { formId: form.id, linkId, visitorId: ctx.visitorId, payload, ipHash },
+        data: { formId: form.id, linkId, visitorId, payload, ipHash },
         select: { id: true, createdAt: true },
       });
-      if (ctx.visitorId) {
-        await tx.event.create({ data: this.eventData(form.id, linkId, ctx.visitorId, 'SUBMIT_SUCCESS', ctx, { submissionId: s.id }) });
-      }
+      await tx.event.create({ data: this.eventData(form.id, linkId, visitorId, 'SUBMIT_SUCCESS', ctx, { submissionId: s.id }) });
       return s;
     });
   }
 
-  /** 필드 수·값 길이 제한, string | string[] 만 허용 */
+  /** 필드 수·키 형식·값 길이 제한, string | string[] 만 허용 */
   private sanitizePayload(fields: Record<string, unknown>): Payload {
     const keys = Object.keys(fields ?? {});
     if (keys.length === 0) throw new BadRequestException('fields must not be empty');
     if (keys.length > MAX_FIELDS) throw new BadRequestException(`too many fields (max ${MAX_FIELDS})`);
-    const payload: Payload = {};
+    const payload: Payload = Object.create(null);
     for (const k of keys) {
+      if (!FIELD_KEY.test(k)) throw new BadRequestException(`invalid field name "${k.slice(0, 30)}"`);
       const v = fields[k];
       if (typeof v === 'string') payload[k] = v.slice(0, MAX_VALUE_LEN);
       else if (Array.isArray(v) && v.every((x) => typeof x === 'string')) payload[k] = (v as string[]).map((x) => x.slice(0, MAX_VALUE_LEN));

@@ -18,7 +18,8 @@
 | 실패 | `SUBMIT_ERROR` | 주입 스크립트 | 응답 ≠ 2xx(`status`) 또는 fetch 실패(`network`) |
 
 - `VIEW`·`SUBMIT_SUCCESS` 는 서버만 기록한다. 클라이언트가 보낼 수 있는 타입은 4종으로 제한(400).
-- 브라우저 이벤트는 `navigator.sendBeacon` 으로 `POST /f/:slug/events` (같은 origin → CSP 변경 없음). 방문자 쿠키가 없으면 204 로 받되 기록하지 않는다.
+- 브라우저 이벤트는 `fetch(keepalive)` 로 `POST /f/:slug/events` (같은 origin → CSP 변경 없음). 모든 POST 는 렌더 시 주입된 `X-GU-Token`(slug·방문자 바인딩) 이 있어야 한다 — 없으면 403.
+- 작성 시작은 `input`/`change` 만 센다(`focus`/`autofocus` 제외). 폼이 없으면 폼 도달을 보내지 않는다. 제출은 문서 단위로 위임받아 어느 `<form>` 이든(`data-gu-form` 으로 한정 가능) 처리하고, 운영자 JS 가 `preventDefault()` 했으면 개입하지 않는다.
 
 ### 2. 저장
 - 기존 `visits` 테이블을 범용 `events` 로 교체. 마이그레이션에서 `visits → VIEW`, `submissions(visitorId 있음) → SUBMIT_SUCCESS` 로 이관.

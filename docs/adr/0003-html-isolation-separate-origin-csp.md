@@ -19,6 +19,11 @@
 5. 관리자 화면에서는 HTML 을 **렌더하지 않고 소스만 표시**. iframe 미리보기도 두지 않는다 (frame-ancestors 'none' 과도 일관).
 6. 업로드 검증: `.html` 확장자, 512KB 이하, `<form>` 1개 이상.
 
+### 추가 (2026-09-16, 적대적 리뷰 반영)
+- **같은 forms origin 을 모든 운영자가 공유**하므로 운영자 A 의 HTML 이 `connect-src 'self'` 안에서 운영자 B 의 `/f/<slug>` 에 제출할 수 있었다. 렌더 시 `(slug, visitorId)` 에 HMAC 으로 묶인 토큰을 스크립트에 넣고 모든 POST 에 `X-GU-Token` 을 요구해 차단한다. 같은 토큰이 쿠키 위조(임의 UUID 로 방문자 수 부풀리기)도 막는다.
+- 쿠키에 `domain` 을 주지 않는다. 커스텀 도메인으로 옮길 때 forms 와 관리자(web/api)는 **eTLD+1 도 달라야** 한다 — 같은 등록 도메인이면 운영자 JS 가 `document.cookie` 로 관리자 세션 고정을 시도할 수 있다. 현재 `*.up.railway.app` 은 Public Suffix List 에 있어 안전.
+- `IP_HASH_SALT` 는 16자 미만이면 forms 가 기동하지 않는다(기본값 역산 방지). 공개 서버의 Swagger 는 운영에서 끈다.
+
 ## 대안
 - 같은 origin + iframe sandbox: 공개 URL 로 직접 접근하면 sandbox 가 없다. 서버 측 격리가 필요.
 - DOMPurify 로 스크립트 제거: 폼 기능이 사라지고, 우회 가능성이 있다.

@@ -3,27 +3,25 @@
  * - 퍼널 이벤트(form_view / form_start / submit_attempt / submit_error) 를 /f/:slug/events 로 전송.
  * - 문서 단위로 submit 을 위임 받아(어느 <form> 이든, 나중에 렌더된 폼 포함) 필드를 JSON 으로 /f/:slug/submissions 에 POST.
  * - 운영자 JS 가 preventDefault() 했으면(자체 검증 실패) 개입하지 않는다. 진행 중 재진입 차단.
+ * - 모든 POST 에 X-GU-Token(slug·방문자 바인딩 HMAC) 을 실어 다른 운영자 HTML 의 교차 제출·방문자 위조를 막는다.
  * - 모두 같은 origin (CSP connect-src 'self'). 성공 시 폼을 감사 메시지로 교체, 실패 시 alert.
  * - 대상 폼 지정: <form data-gu-form> 이 있으면 그 폼만, 없으면 모든 폼.
  */
-export function buildInjectScript(slug: string, linkCode: string | null): string {
+export function buildInjectScript(slug: string, linkCode: string | null, token: string): string {
   const submitUrl = `/f/${encodeURIComponent(slug)}/submissions`;
   const eventUrl = `/f/${encodeURIComponent(slug)}/events`;
   return `
 (function(){
   var LINK = ${JSON.stringify(linkCode)};
+  var TOKEN = ${JSON.stringify(token)};
   var EVENT_URL = ${JSON.stringify(eventUrl)};
   var SUBMIT_URL = ${JSON.stringify(submitUrl)};
+  var HEADERS = { 'Content-Type': 'application/json', 'X-GU-Token': TOKEN };
 
-  // 퍼널 이벤트 전송. sendBeacon(페이지 이탈 중에도 전달) → 실패/미지원 시 keepalive fetch.
+  // 퍼널 이벤트 전송. 토큰 헤더가 필요해 keepalive fetch 사용(페이지 이탈 중에도 전달).
   function track(type, meta){
     try {
-      var body = JSON.stringify({ linkCode: LINK, type: type, meta: meta || {} });
-      var sent = false;
-      if (navigator.sendBeacon) {
-        try { sent = navigator.sendBeacon(EVENT_URL, new Blob([body], { type: 'application/json' })); } catch (e) { sent = false; }
-      }
-      if (!sent) fetch(EVENT_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: body, keepalive: true, credentials: 'same-origin' });
+      fetch(EVENT_URL, { method: 'POST', headers: HEADERS, body: JSON.stringify({ linkCode: LINK, type: type, meta: meta || {} }), keepalive: true, credentials: 'same-origin' }).catch(function(){});
     } catch (e) {}
   }
 
@@ -83,7 +81,7 @@ export function buildInjectScript(slug: string, linkCode: string | null): string
     track('submit_attempt', { fields: Object.keys(fields).length });
     fetch(SUBMIT_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: HEADERS,
       credentials: 'same-origin',
       body: JSON.stringify({ linkCode: LINK, fields: fields })
     }).then(function(r){
