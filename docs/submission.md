@@ -14,19 +14,22 @@
 | 실행 가능한 소스 | 저장소 루트 (`apps/api`, `apps/forms`, `apps/web`, `packages/*`) |
 | DB 스키마 · 마이그레이션 | `packages/db/prisma/schema.prisma`, `packages/db/prisma/migrations/`, 설명·ERD `docs/schema.md`, `docs/diagrams/erd.png` |
 | 시스템 구성도 · 흐름도 | `docs/architecture.md`, `docs/diagrams/*.png` |
+| 퍼널 정의 · 보안 결정 | `docs/adr/0007-funnel-stages-and-events.md`, `docs/adr/0003-html-isolation-separate-origin-csp.md` |
 | `.env.example` | 루트 |
 | 테스트 코드 | `apps/api/test`, `apps/forms/test` (Jest e2e), `apps/e2e/tests` (Playwright) |
 | API 문서 | `docs/api.md` + 각 서버 `/docs` (Swagger) |
 | README | 루트 — 실행 방법 · 테스트 방법 |
 | ADR | `docs/adr/` (0001~0006, 인덱스 `docs/adr/README.md`) |
 
-## 검증 결과 (2026-09-16)
+## 검증 결과 (2026-09-17)
+
+적대적 코드 리뷰(3개 영역, 70건 지적) 반영 후 수치. 리뷰 반영 PR: #29~#35.
 
 | 검증 | 결과 |
 |---|---|
-| 관리자 API e2e (Jest, 실제 Postgres) | 28/28 (인증·도메인·퍼널 집계) + 단위 11/11 (metrics·period·journey) |
-| 공개 폼 e2e (Jest, 실제 Postgres) | 14/14 (렌더·이벤트 수집·제출) |
-| 브라우저 e2e (Playwright) — docker compose · Railway 운영 | 5/5 · 5/5 (퍼널 화면 3종 방문자 시나리오 포함) |
+| 관리자 API e2e (Jest, 실제 Postgres) | 34/34 (인증·도메인·퍼널 집계·에러 매핑) + 단위 11/11 (metrics·period·journey) |
+| 공개 폼 e2e (Jest, 실제 Postgres) | 19/19 (렌더·이벤트 수집·POST 토큰·입력 검증·제출) |
+| 브라우저 e2e (Playwright) — docker compose · Railway 운영 | 5/5 · 5/5 (퍼널 화면 3종 방문자 시나리오, 필터 URL 동기화, HTML 격리) |
 | `docker compose up -d --build` 전체 스택 | 로그인 → 업로드 → 링크 → 방문 → 제출 → 성과 정상 |
 
 ## 데모 시나리오 (3분)

@@ -15,7 +15,7 @@ docker compose up -d --build
 
 - 관리자 화면: http://localhost:3000 — 로그인 `admin@glowuprizz.com` / `Password123!`
 - 관리자 API Swagger: http://localhost:3001/docs
-- 공개 폼 서버: http://127.0.0.1:3002 (Swagger `/docs`) — 배포 링크는 이 호스트로 발급됩니다. 관리자(`localhost`)와 호스트가 달라 쿠키가 분리됩니다.
+- 공개 폼 서버: http://127.0.0.1:3002 (Swagger `/docs` — compose 는 `FORMS_DOCS=1` 로 켬, 운영에서는 꺼짐) — 배포 링크는 이 호스트로 발급됩니다. 관리자(`localhost`)와 호스트가 달라 쿠키가 분리됩니다.
 
 api 컨테이너가 기동할 때 DB 마이그레이션과 운영자 시드를 자동 수행합니다. 시드 계정은 `.env` 의 `SEED_OPERATOR_EMAIL` / `SEED_OPERATOR_PASSWORD` 로 바꿀 수 있습니다.
 
@@ -42,10 +42,11 @@ pnpm dev                                      # api :3001, forms :3002, web :300
 pnpm install
 docker compose up -d postgres-test
 
-# 1) 관리자 API e2e — 인증 성공/실패, 템플릿 등록 검증, 캠페인/폼/링크, 성과 집계, CRM 명단, 타 운영자 접근 차단
+# 1) 관리자 API — 단위(metrics·period·journey) + e2e(인증 성공/실패, 템플릿 등록 검증, 캠페인/폼/링크, 퍼널 집계, CRM 명단, 타 운영자 접근 차단)
+pnpm --filter @glowuprizz/api test
 pnpm --filter @glowuprizz/api test:e2e
 
-# 2) 공개 폼 e2e — 링크 렌더/스크립트 주입/CSP 헤더, 방문·방문자 집계, 제출 성공/실패, 일시중지
+# 2) 공개 폼 e2e — 링크 렌더/스크립트 주입/CSP 헤더, 방문·방문자 집계, 이벤트 수집·토큰 검증, 제출 성공/실패, 일시중지
 pnpm --filter @glowuprizz/forms test:e2e
 
 # 1)+2) 한 번에 (순차 실행)
