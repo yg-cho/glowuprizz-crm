@@ -35,10 +35,17 @@ describe('Auth (e2e)', () => {
     await request(app.getHttpServer()).get('/api/campaigns').expect(401);
     await request(app.getHttpServer()).get('/api/submissions').expect(401);
     await request(app.getHttpServer()).get('/api/stats/funnel').expect(401);
+    await request(app.getHttpServer()).get('/api/config').expect(401);
   });
 
   it('위조 쿠키는 401', async () => {
     await request(app.getHttpServer()).get('/api/auth/me').set('Cookie', 'gu_admin=eyJhbGciOiJIUzI1NiJ9.fake.sig').expect(401);
+  });
+
+  it('config: 공개 폼 origin 반환', async () => {
+    const cookie = await login(app);
+    const r = await request(app.getHttpServer()).get('/api/config').set('Cookie', cookie).expect(200);
+    expect(r.body).toEqual({ formsPublicOrigin: 'http://127.0.0.1:3002' });
   });
 
   it('운영자가 삭제되면 서명이 유효한 토큰도 401', async () => {
