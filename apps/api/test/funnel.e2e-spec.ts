@@ -73,25 +73,29 @@ describe('Operator funnel (e2e)', () => {
       await v('v2', links.INSTAGRAM.id);
       await v('v3', links.YOUTUBE.id);
       await v('v4', null); // 직접 유입
-      await prisma.submission.create({ data: { formId: form.id, linkId: links.INSTAGRAM.id, visitorId: 'v1', payload: { name: 'A' } } });
-      await prisma.submission.create({ data: { formId: form.id, linkId: links.YOUTUBE.id, visitorId: 'v3', payload: { name: 'B' } } });
+      // 신청 = submissions 행 + SUBMIT_SUCCESS 이벤트 (forms 서버가 트랜잭션으로 함께 기록하는 형태)
+      const sub = async (vid: string, linkId: string) => {
+        await prisma.submission.create({ data: { formId: form.id, linkId, visitorId: vid, payload: { name: vid } } });
+        await prisma.event.create({ data: { formId: form.id, linkId, visitorId: vid, type: 'SUBMIT_SUCCESS' } });
+      };
+      await sub('v1', links.INSTAGRAM.id);
+      await sub('v3', links.YOUTUBE.id);
 
-      // 캠페인별: 방문 5, 방문자 4, 신청 2, 전환 0.5
-      const byCampaign = (await request(app.getHttpServer()).get('/api/stats/campaigns').set('Cookie', cookie).expect(200)).body;
-      expect(byCampaign).toEqual([
-        { campaignId: camp.id, campaignName: '9월 캠페인', visits: 5, visitors: 4, submissions: 2, conversionRate: 0.5 },
-      ]);
+      // 캠페인별(전 기간): 페이지뷰 5, 방문자 4, 신청 2, 전환 0.5
+      const byCampaign = (await request(app.getHttpServer()).get('/api/stats/campaigns?range=all').set('Cookie', cookie).expect(200)).body;
+      expect(byCampaign).toHaveLength(1);
+      expect(byCampaign[0]).toMatchObject({ campaignId: camp.id, campaignName: '9월 캠페인', pageViews: 5, VIEW: 4, SUBMIT_SUCCESS: 2, conversionRate: 0.5, formsCount: 1, linksCount: 4 });
 
       // 채널별: 직접 유입 제외
-      const byChannel = (await request(app.getHttpServer()).get('/api/stats/channels').set('Cookie', cookie).expect(200)).body;
+      const byChannel = (await request(app.getHttpServer()).get('/api/stats/channels?range=all').set('Cookie', cookie).expect(200)).body;
       const ch = Object.fromEntries(byChannel.map((r: { channel: string }) => [r.channel, r]));
-      expect(ch.INSTAGRAM).toMatchObject({ visits: 3, visitors: 2, submissions: 1, conversionRate: 0.5 });
-      expect(ch.YOUTUBE).toMatchObject({ visits: 1, visitors: 1, submissions: 1, conversionRate: 1 });
-      expect(ch.X).toMatchObject({ visits: 0, visitors: 0, submissions: 0, conversionRate: 0 });
-      expect(ch.THREADS).toMatchObject({ visits: 0, visitors: 0, submissions: 0, conversionRate: 0 });
+      expect(ch.INSTAGRAM).toMatchObject({ pageViews: 3, VIEW: 2, SUBMIT_SUCCESS: 1, clickToSubmit: 0.5, share: 0.5 });
+      expect(ch.YOUTUBE).toMatchObject({ pageViews: 1, VIEW: 1, SUBMIT_SUCCESS: 1, clickToSubmit: 1 });
+      expect(ch.X).toMatchObject({ pageViews: 0, VIEW: 0, SUBMIT_SUCCESS: 0, clickToSubmit: 0 });
+      expect(ch.THREADS).toMatchObject({ pageViews: 0, VIEW: 0, SUBMIT_SUCCESS: 0 });
 
       // 캠페인 필터
-      const filtered = (await request(app.getHttpServer()).get(`/api/stats/channels?campaignId=${camp.id}`).set('Cookie', cookie).expect(200)).body;
+      const filtered = (await request(app.getHttpServer()).get(`/api/stats/channels?range=all&campaignId=${camp.id}`).set('Cookie', cookie).expect(200)).body;
       expect(filtered).toEqual(byChannel);
 
       // overview
@@ -108,6 +112,7 @@ describe('Operator funnel (e2e)', () => {
       await request(app.getHttpServer()).delete(`/api/links/${links.YOUTUBE.id}`).set('Cookie', cookie).expect(204);
       const kept = await prisma.submission.count({ where: { formId: form.id } });
       expect(kept).toBe(2);
+      expect(await prisma.event.count({ where: { formId: form.id } })).toBe(7);
 
       // 폼 일시중지
       await request(app.getHttpServer()).patch(`/api/forms/${form.id}`).set('Cookie', cookie).send({ status: 'PAUSED' }).expect(200);
