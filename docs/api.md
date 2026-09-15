@@ -143,7 +143,7 @@
 | 파라미터 | 값 | 기본 |
 |---|---|---|
 | `range` | `today` `7d` `30d` `90d` `all` `custom` | `7d` (from/to 있으면 `custom`) |
-| `from`, `to` | ISO 8601, `[from, to)` | — |
+| `from`, `to` | ISO 8601, `[from, to)`. 날짜만(`2026-09-14`) 주면 KST 자정으로 해석 | — |
 | `compare` | `1`/`true` 이면 같은 길이의 직전 기간도 계산 (`all` 제외) | `false` |
 | `campaignId`, `formId` | 내 소유 아니면 404 | — |
 | `channel` | `INSTAGRAM` `X` `YOUTUBE` `THREADS` | — |
@@ -205,6 +205,7 @@
 `grid[dow][hour]`, dow 0=일요일, KST.
 
 ### GET `/api/stats/failures`
+상위 20개 사유, 나머지는 `other` 로 합산.
 ```json
 [{ "reason": "network", "status": null, "count": 7 }, { "reason": "http", "status": 400, "count": 4 }]
 ```
@@ -222,7 +223,7 @@
 ```
 
 ### GET `/api/stats/visitors`
-단계까지 도달한 방문자 목록 + 여정. 추가 파라미터: `stage`(`FORM_VIEW`|`FORM_START`|`SUBMIT_ATTEMPT`, 기본 `FORM_START`), `submitted`(`true`|`false`, 기본 `false` = 미신청·리마케팅 후보), `page`, `pageSize`(≤100).
+단계까지 도달한 방문자 목록 + 여정(폼 단위). 도달 = 그 단계 이상 이벤트가 하나라도 있음. 추가 파라미터: `stage`(`FORM_VIEW`|`FORM_START`|`SUBMIT_ATTEMPT`, 기본 `FORM_START`), `submitted`(`true`|`false`, 기본 `false` = 미신청·리마케팅 후보), `page`, `pageSize`(≤100).
 ```json
 { "total": 1, "page": 1, "pageSize": 20,
   "items": [{ "visitorId": "uuid", "formId": "uuid", "firstSeen": "...", "lastSeen": "...", "views": 3, "lastChannel": "X", "lastStage": "FORM_START",
