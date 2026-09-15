@@ -124,23 +124,113 @@
 
 ---
 
+## 6-1. 신청 여정 `GET /api/submissions/:id/journey`
+```json
+{ "submission": { "id": "uuid", "formId": "uuid", "visitorId": "uuid", "createdAt": "...", "link": { "id": "uuid", "channel": "INSTAGRAM", "code": "…" } },
+  "events": [ /* 방문자의 같은 폼 이벤트, createdAt → 단계 순 */ ], "visits": 2, "secondsToSubmit": 1560 }
+```
+방문자 쿠키 없이 제출된 건은 `events: []`. 404: 내 소유 아님.
+
+---
+
+---
+
 ## 7. 성과 `/api/stats`
 
-정의(ADR-0005): 방문 = 페이지뷰, 방문자 = 고유 `gu_vid` 쿠키, 전환율 = 신청 ÷ 방문자 (방문자 0 → 0).
+정의(ADR-0007): 단계 수 = 해당 이벤트를 1회 이상 낸 **고유 방문자**(`gu_vid`). 단계 = `VIEW`(링크 클릭) → `FORM_VIEW`(폼 도달) → `FORM_START`(작성 시작) → `SUBMIT_ATTEMPT`(제출 시도) → `SUBMIT_SUCCESS`(신청 완료). 실패 = `SUBMIT_ERROR`.
 
-### GET `/api/stats/overview`
+### 공통 쿼리 (모든 `/api/stats/*`)
+| 파라미터 | 값 | 기본 |
+|---|---|---|
+| `range` | `today` `7d` `30d` `90d` `all` `custom` | `7d` (from/to 있으면 `custom`) |
+| `from`, `to` | ISO 8601, `[from, to)` | — |
+| `compare` | `1`/`true` 이면 같은 길이의 직전 기간도 계산 (`all` 제외) | `false` |
+| `campaignId`, `formId` | 내 소유 아니면 404 | — |
+| `channel` | `INSTAGRAM` `X` `YOUTUBE` `THREADS` | — |
+
+기간은 KST 자정 기준. 400: 잘못된 range/채널/from≥to.
+
+### GET `/api/stats/funnel`
 ```json
-{ "visits": 5, "visitors": 4, "submissions": 2, "campaigns": 1, "forms": 1, "conversionRate": 0.5 }
+{
+  "range": "7d", "period": { "from": "2026-09-10T15:00:00.000Z", "to": "2026-09-17T15:00:00.000Z" },
+  "current": {
+    "stages": [
+      { "type": "VIEW", "label": "링크 클릭", "visitors": 1284, "stepRate": 1, "cumulativeRate": 1, "dropoff": 0 },
+      { "type": "FORM_VIEW", "label": "폼 도달", "visitors": 1190, "stepRate": 0.9268, "cumulativeRate": 0.9268, "dropoff": 94 },
+      { "type": "FORM_START", "label": "작성 시작", "visitors": 612, "stepRate": 0.5143, "cumulativeRate": 0.4766, "dropoff": 578 },
+      { "type": "SUBMIT_ATTEMPT", "label": "제출 시도", "visitors": 431, "stepRate": 0.7042, "cumulativeRate": 0.3357, "dropoff": 181 },
+      { "type": "SUBMIT_SUCCESS", "label": "신청 완료", "visitors": 418, "stepRate": 0.9698, "cumulativeRate": 0.3255, "dropoff": 13 }
+    ],
+    "pageViews": 1812, "submitErrors": 13, "overallRate": 0.3255, "maxDropStage": "FORM_START"
+  },
+  "previous": null
+}
 ```
+`compare=1` 이면 `previous` 에 같은 구조 + `period`.
+
+### GET `/api/stats/timeseries`
+일별(KST). 기간 안의 빈 날은 0.
+```json
+[{ "day": "2026-09-12", "visitors": 180, "formStarts": 90, "submissions": 61, "conversionRate": 0.3389 }]
+```
+
+### GET `/api/stats/channels`
+4채널 항상 반환(직접 유입 제외). `share` = 채널 신청 ÷ 전체 신청.
+```json
+[{ "channel": "INSTAGRAM", "VIEW": 742, "FORM_VIEW": 701, "FORM_START": 402, "SUBMIT_ATTEMPT": 300, "SUBMIT_SUCCESS": 289,
+   "pageViews": 1010, "submitErrors": 4, "clickToSubmit": 0.3895, "startToSubmit": 0.7189, "share": 0.6914 }]
+```
+
 ### GET `/api/stats/campaigns`
 ```json
-[{ "campaignId": "uuid", "campaignName": "9월 무료 PT", "visits": 5, "visitors": 4, "submissions": 2, "conversionRate": 0.5 }]
+[{ "campaignId": "uuid", "campaignName": "9월 무료 PT", "createdAt": "...", "formsCount": 2, "linksCount": 6,
+   "VIEW": 1102, "FORM_VIEW": 1024, "FORM_START": 548, "SUBMIT_ATTEMPT": 384, "SUBMIT_SUCCESS": 372, "pageViews": 1500, "conversionRate": 0.3376 }]
 ```
-### GET `/api/stats/channels?campaignId=`
-항상 4채널 모두 반환. 직접 유입(`/f/:slug`) 은 제외.
+
+### GET `/api/stats/links`
+링크별. `form: { id, name, slug }` 포함. 필드는 campaigns 와 동일(+`linkId`, `channel`, `code`).
+
+### GET `/api/stats/forms`
+폼별 단계 전환율(템플릿 A/B).
 ```json
-[{ "channel": "INSTAGRAM", "visits": 3, "visitors": 2, "submissions": 1, "conversionRate": 0.5 }, ...]
+[{ "formId": "uuid", "name": "폼 A", "slug": "a", "status": "ACTIVE", "template": { "id": "uuid", "name": "다크" },
+   "stages": [ /* funnel.stages 와 같은 형태 */ ], "overallRate": 0.367 }]
 ```
+
+### GET `/api/stats/heatmap`
+```json
+{ "grid": [[0, 0, …24개], …7행], "max": 41 }
+```
+`grid[dow][hour]`, dow 0=일요일, KST.
+
+### GET `/api/stats/failures`
+```json
+[{ "reason": "network", "status": null, "count": 7 }, { "reason": "http", "status": 400, "count": 4 }]
+```
+
+### GET `/api/stats/quality`
+```json
+{ "submittersOnce": 340, "submittersMulti": 78, "onceRate": 0.8134, "multiRate": 0.1866, "avgVisitsPerSubmitter": 1.3,
+  "duplicatePhones": 9, "suspectedBots": 94, "suspectedBotRate": 0.0732 }
+```
+
+### GET `/api/stats/insights`
+규칙 기반 문장. 링크 클릭 방문자 20명 미만이면 `[]`.
+```json
+[{ "level": "warn", "text": "작성 시작 단계 이탈 49% 로 가장 큼 — 첫 화면에 입력칸이 보이는지, 카피·디자인 점검" }]
+```
+
+### GET `/api/stats/visitors`
+단계까지 도달한 방문자 목록 + 여정. 추가 파라미터: `stage`(`FORM_VIEW`|`FORM_START`|`SUBMIT_ATTEMPT`, 기본 `FORM_START`), `submitted`(`true`|`false`, 기본 `false` = 미신청·리마케팅 후보), `page`, `pageSize`(≤100).
+```json
+{ "total": 1, "page": 1, "pageSize": 20,
+  "items": [{ "visitorId": "uuid", "formId": "uuid", "firstSeen": "...", "lastSeen": "...", "views": 3, "lastChannel": "X", "lastStage": "FORM_START",
+              "journey": [{ "id": "uuid", "type": "VIEW", "meta": null, "createdAt": "...", "link": { "id": "uuid", "channel": "X", "code": "…" } }] }] }
+```
+
+### GET `/api/stats/overview`
+전 기간 합계(대시보드 하위 호환): `{ visits, visitors, submissions, campaigns, forms, conversionRate }`.
 
 ---
 
@@ -170,5 +260,14 @@ Set-Cookie: gu_vid=<uuid>; HttpOnly; SameSite=Lax; Max-Age=31536000
 - `fields`: 1~50개, 값은 string 또는 string[], 각 2000자로 절단.
 - → 201 `{ "id": "uuid", "createdAt": "..." }`
 - 400 필드 비었거나 형식 오류 · 403 `PAUSED` · 404 폼 없음 · 429 분당 20회 초과
+
+### POST `/f/:slug/events`
+주입 스크립트가 `navigator.sendBeacon` 으로 호출. 방문자 쿠키(`gu_vid`) 없으면 204 로 받되 기록하지 않음.
+```json
+{ "linkCode": "htuqbxbe", "type": "form_start", "meta": { "field": "phone" } }
+```
+- `type`: `form_view` | `form_start` | `submit_attempt` | `submit_error` (서버 전용 `view`/`submit_success` 는 400)
+- `meta`: 객체, JSON 1KB 이하. `form_view {hasForm, fields}`, `form_start {field}`, `submit_attempt {fields}`, `submit_error {reason: "http"|"network", status?}`
+- → 204 · 400 검증 실패 · 403 `PAUSED` · 404 폼 없음 · 429 분당 120회 초과
 
 ### GET `/healthz` → `{ "ok": true }`

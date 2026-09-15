@@ -24,9 +24,9 @@
 
 | 검증 | 결과 |
 |---|---|
-| 관리자 API e2e (Jest, 실제 Postgres) | 14/14 |
-| 공개 폼 e2e (Jest, 실제 Postgres) | 10/10 |
-| 브라우저 e2e (Playwright) — 로컬 dev / docker compose / Railway 운영 | 4/4 · 4/4 · 4/4 |
+| 관리자 API e2e (Jest, 실제 Postgres) | 27/27 (인증·도메인·퍼널 집계) |
+| 공개 폼 e2e (Jest, 실제 Postgres) | 14/14 (렌더·이벤트 수집·제출) |
+| 브라우저 e2e (Playwright) — docker compose | 5/5 (퍼널 화면 3종 방문자 시나리오 포함) |
 | `docker compose up -d --build` 전체 스택 | 로그인 → 업로드 → 링크 → 방문 → 제출 → 성과 정상 |
 
 ## 데모 시나리오 (3분)
@@ -35,5 +35,5 @@
 2. **캠페인 · 폼** 에서 캠페인 생성 → 템플릿 선택해 폼 생성
 3. 폼 상세에서 인스타그램 / 유튜브 링크 생성 → 복사
 4. 시크릿 창에서 링크 열기 → 폼 작성·제출 (전화번호 자동 포맷 = 운영자 HTML 의 JS 가 살아 있음)
-5. **대시보드** 에서 캠페인별 / 채널별 방문·방문자·신청·전환율 확인, **CRM 명단** 에서 신청 내용 확인
+5. **대시보드** 에서 5단계 퍼널(클릭→폼 도달→작성→제출→완료)·최대 이탈 구간·채널 비교·일별 추이 확인, **캠페인 상세** 에서 링크별·폼 A/B·시간대 히트맵, **CRM 명단** 에서 신청자 여정 펼치기와 '작성만 하고 미신청' 탭
 6. (격리 확인) 공개 폼 devtools → Application → Cookies 에 `gu_admin` 없음, Console 에서 `fetch('https://api-production-fd80.up.railway.app/api/submissions')` 가 CSP 로 차단됨

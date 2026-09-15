@@ -20,9 +20,9 @@ flowchart LR
     API["apps/api  (NestJS)\n인증 · 템플릿 · 캠페인 · 폼\n링크 · CRM 명단 · 성과\nSwagger /docs"]
   end
   subgraph FormsOrigin["공개 폼 origin  ·  forms-*.up.railway.app"]
-    FORMS["apps/forms  (NestJS)\n/l/:code  /f/:slug 렌더\n제출 스크립트 주입 · CSP\n방문 기록 · 제출 저장\n(관리자 라우트 없음)"]
+    FORMS["apps/forms  (NestJS)\n/l/:code  /f/:slug 렌더\n스크립트 주입 · CSP\n이벤트 수집 · 제출 저장\n(관리자 라우트 없음)"]
   end
-  DB[("PostgreSQL\noperators · html_templates\ncampaigns · forms\ndistribution_links\nvisits · submissions")]
+  DB[("PostgreSQL\noperators · html_templates\ncampaigns · forms\ndistribution_links\nevents · submissions")]
 
   OB -- "HTTPS, 쿠키 gu_admin (httpOnly)" --> WEB
   WEB -- "private network\n쿠키 그대로 전달" --> API
@@ -36,7 +36,7 @@ flowchart LR
 ```
 
 - 세 origin 은 서로 다른 호스트. 등록 HTML 은 forms origin 에서만 실행되며 관리자 쿠키·DOM·API 에 닿을 수 없다 (ADR-0003).
-- forms 프로세스에는 관리자 컨트롤러 코드 자체가 없다. 두 서버가 같은 DB 를 쓰되 forms 는 `visits` / `submissions` 쓰기와 `forms` / `distribution_links` / `html_templates` 읽기만 한다.
+- forms 프로세스에는 관리자 컨트롤러 코드 자체가 없다. 두 서버가 같은 DB 를 쓰되 forms 는 `events` / `submissions` 쓰기와 `forms` / `distribution_links` / `html_templates` 읽기만 한다.
 - 로컬(docker compose): web `localhost:3000`, api `localhost:3001`, forms `127.0.0.1:3002` — 호스트를 달리해 쿠키 분리.
 
 ## 2. 운영자 흐름
@@ -82,19 +82,21 @@ sequenceDiagram
   V->>F: GET /l/{code}
   F->>DB: distribution_links → forms → html_templates 조회
   F->>F: 폼 ACTIVE 확인, gu_vid 쿠키 발급/읽기
-  F->>DB: visits INSERT (formId, linkId, visitorId, ipHash)
+  F->>DB: events INSERT (type=VIEW, formId, linkId, visitorId, ipHash)
   F->>F: 원본 HTML 끝에 제출 스크립트 주입
   F-->>V: 200 text/html + CSP (connect-src 'self', frame-ancestors 'none')
 
+  V-->>F: beacon form_view (스크립트 실행됨 = 폼 도달)
   V->>V: 폼 작성 (운영자 HTML 의 JS 정상 동작)
-  V->>F: submit → 스크립트가 가로채 POST /f/{slug}/submissions {linkCode, fields}
+  V-->>F: beacon form_start {field}
+  V->>F: submit → beacon submit_attempt, 스크립트가 가로채 POST /f/{slug}/submissions {linkCode, fields}
   F->>F: 필드 ≤50 · 값 ≤2000자 · linkCode 가 이 폼 소속인지 확인
-  F->>DB: submissions INSERT (payload JSONB, linkId, visitorId)
-  F-->>V: 201 → "신청 완료" 표시
+  F->>DB: submissions INSERT + events(SUBMIT_SUCCESS) INSERT (한 트랜잭션)
+  F-->>V: 201 → "신청 완료" 표시 (실패 시 beacon submit_error)
 
-  Op->>Api: GET /api/stats/campaigns · /api/stats/channels
-  Api->>DB: visits / submissions 집계 (COUNT, COUNT DISTINCT visitorId)
-  Api-->>Op: 방문 · 방문자 · 신청 · 전환율(신청÷방문자)
+  Op->>Api: GET /api/stats/funnel · channels · links · forms · timeseries
+  Api->>DB: events 를 type 별 COUNT DISTINCT visitorId (기간·캠페인·채널 필터)
+  Api-->>Op: 5단계 퍼널 · 채널/링크/폼별 · 일별 추이 · 여정
   Op->>Api: GET /api/submissions → CRM 명단
 ```
 
