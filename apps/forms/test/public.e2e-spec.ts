@@ -88,6 +88,20 @@ describe('Public forms (e2e)', () => {
       expect(await prisma.event.count()).toBe(0);
     });
 
+    it('HEAD 요청은 렌더하지만 VIEW 를 기록하지 않음', async () => {
+      await request(app.getHttpServer()).head(`/l/${igCode}`).expect(200);
+      expect(await prisma.event.count({ where: { formId, type: 'VIEW' } })).toBe(0);
+    });
+
+    it('주입 위치: 문자열 안의 </body> 가 아닌 마지막 </body> 앞', async () => {
+      const tricky = `<html><body><script>var s = "</body>";</script><form><input name="a"/></form></body></html>`;
+      await prisma.htmlTemplate.updateMany({ data: { html: tricky } });
+      const res = await request(app.getHttpServer()).get(`/l/${igCode}`).expect(200);
+      const idx = res.text.indexOf('<script data-gu-inject>');
+      expect(idx).toBeGreaterThan(res.text.indexOf('<form'));
+      expect(res.text.lastIndexOf('</body>')).toBeGreaterThan(idx);
+    });
+
     it('GET /f/:slug 직접 접근은 linkId 없이 기록, linkCode null 주입', async () => {
       const res = await request(app.getHttpServer()).get('/f/my-form').expect(200);
       expect(res.text).toContain('var LINK = null');
