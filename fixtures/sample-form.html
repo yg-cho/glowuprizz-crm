@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>무료 PT 체험 신청</title>
+  <style>
+    body { margin: 0; font-family: system-ui, -apple-system, sans-serif; background: #0f172a; color: #e2e8f0; }
+    .wrap { max-width: 480px; margin: 40px auto; padding: 32px; background: #1e293b; border-radius: 16px; }
+    h1 { margin: 0 0 8px; font-size: 24px; }
+    p { margin: 0 0 24px; color: #94a3b8; }
+    label { display: block; font-size: 13px; margin: 14px 0 6px; color: #cbd5e1; }
+    input, select { width: 100%; box-sizing: border-box; padding: 12px; border-radius: 8px; border: 1px solid #334155; background: #0f172a; color: #fff; font-size: 15px; }
+    button { margin-top: 24px; width: 100%; padding: 14px; border: 0; border-radius: 8px; background: #22c55e; color: #052e16; font-weight: 700; font-size: 16px; cursor: pointer; }
+    button:disabled { opacity: .6; }
+    .row { display: flex; gap: 12px; align-items: center; margin-top: 12px; font-size: 13px; }
+    .row input { width: auto; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>무료 PT 1회 체험 🎁</h1>
+    <p>지금 신청하면 상담 후 체험권을 보내드려요.</p>
+    <form id="apply">
+      <label for="name">이름</label>
+      <input id="name" name="name" required placeholder="홍길동" />
+
+      <label for="phone">연락처</label>
+      <input id="phone" name="phone" type="tel" required placeholder="010-0000-0000" />
+
+      <label for="goal">운동 목표</label>
+      <select id="goal" name="goal">
+        <option value="diet">다이어트</option>
+        <option value="muscle">근력 증가</option>
+        <option value="health">건강 관리</option>
+      </select>
+
+      <div class="row">
+        <input id="agree" name="agree" type="checkbox" value="yes" required />
+        <label for="agree" style="margin:0">개인정보 수집·이용에 동의합니다</label>
+      </div>
+
+      <button type="submit">신청하기</button>
+    </form>
+  </div>
+  <script>
+    // AI 가 붙인 간단한 전화번호 포맷팅
+    document.getElementById('phone').addEventListener('input', function (e) {
+      var v = e.target.value.replace(/\D/g, '').slice(0, 11);
+      if (v.length > 7) v = v.replace(/(\d{3})(\d{4})(\d+)/, '$1-$2-$3');
+      else if (v.length > 3) v = v.replace(/(\d{3})(\d+)/, '$1-$2');
+      e.target.value = v;
+    });
+  </script>
+</body>
+</html>
