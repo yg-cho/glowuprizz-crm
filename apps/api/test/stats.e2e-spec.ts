@@ -234,6 +234,9 @@ describe('Funnel stats (e2e)', () => {
     expect(yt.total).toBe(1);
     await get(`/api/submissions?channel=TIKTOK`).expect(400);
     await get(`/api/submissions?pageSize=1000`).expect(400);
+    await get(`/api/submissions?page=abc`).expect(400);
+    await get(`/api/stats/visitors?page=abc`).expect(400);
+    await get(`/api/stats/visitors?pageSize=0`).expect(400);
   });
 
   it('실패: 잘못된 range / from>to / 남의 캠페인 / 잘못된 채널', async () => {

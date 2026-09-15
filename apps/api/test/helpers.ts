@@ -1,10 +1,10 @@
-import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
-import cookieParser from 'cookie-parser';
 import bcrypt from 'bcryptjs';
 import request from 'supertest';
 import { PrismaClient } from '@glowuprizz/db';
 import { AppModule } from '../src/app.module';
+import { setupApp } from '../src/app.setup';
 
 export const prisma = new PrismaClient();
 
@@ -17,10 +17,7 @@ export async function resetDb() {
 
 export async function createApp(): Promise<INestApplication> {
   const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
-  const app = moduleRef.createNestApplication();
-  app.use(cookieParser());
-  app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }));
-  app.setGlobalPrefix('api');
+  const app = setupApp(moduleRef.createNestApplication());
   await app.init();
   return app;
 }

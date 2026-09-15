@@ -1,25 +1,20 @@
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe } from '@nestjs/common';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
-import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
+import { setupApp } from './app.setup';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
   app.set('trust proxy', 1); // Railway/프록시 뒤에서 x-forwarded-proto 신뢰
 
   app.use(helmet());
-  app.use(cookieParser());
   app.enableCors({
     origin: (process.env.WEB_ORIGIN ?? 'http://localhost:3000').split(','),
     credentials: true,
   });
-  app.useGlobalPipes(
-    new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }),
-  );
-  app.setGlobalPrefix('api');
+  setupApp(app);
 
   const config = new DocumentBuilder()
     .setTitle('Glowuprizz Lead Magnet CRM — Admin API')

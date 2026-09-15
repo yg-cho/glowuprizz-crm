@@ -8,7 +8,9 @@ import { LoginDto } from './dto/login.dto';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { CurrentOperator, OperatorPrincipal } from '../common/current-operator.decorator';
 
-const COOKIE_MAX_AGE_MS = 1000 * 60 * 60 * 12; // 12h
+import { SESSION_TTL_SEC } from './auth.constants';
+
+const COOKIE_MAX_AGE_MS = SESSION_TTL_SEC * 1000;
 
 @ApiTags('auth')
 @Controller('auth')

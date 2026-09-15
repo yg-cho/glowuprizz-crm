@@ -31,7 +31,7 @@
 ### POST `/api/auth/logout` → 204, 쿠키 제거
 ### GET `/api/auth/me` → 200 `{ operator }` · 401 미인증
 
-이하 모든 관리자 API 는 쿠키 없거나 위조 시 **401**. 다른 운영자의 리소스는 **404**.
+이하 모든 관리자 API 는 쿠키 없거나 위조 시 **401** (운영자가 삭제된 토큰도 401). 다른 운영자의 리소스는 **404**. 세션 12시간.
 
 ---
 
@@ -43,13 +43,13 @@
 | `file` | file | `.html`/`.htm`, ≤ 512KB, `<form>` 1개 이상 필수 |
 | `name` | string? | 미입력 시 파일명 |
 
-응답 201 `{ id, name, sizeBytes, createdAt }` · 400 확장자/크기/폼 없음/파일 누락
+응답 201 `{ id, name, sizeBytes, createdAt }` · 400 확장자/폼 없음/파일 누락 · 413 512KB 초과
 
 원문은 수정 없이 저장된다(스크립트 제거 안 함, ADR-0003).
 
 ### GET `/api/templates` → `[{ id, name, sizeBytes, createdAt, _count: { forms } }]`
 ### GET `/api/templates/:id` → 템플릿 + `html` 원문 · 404
-### DELETE `/api/templates/:id` → 204 · 사용 중인 폼이 있으면 404 메시지로 거부
+### DELETE `/api/templates/:id` → 204 · 사용 중인 폼이 있으면 409
 
 ---
 
@@ -75,7 +75,7 @@
 ```
 - `slug` 선택. `^[a-z0-9]+(-[a-z0-9]+)*$`, 3~60자. 미입력 시 8자 자동 생성.
 - → 201 `{ id, campaignId, templateId, name, slug, status: "ACTIVE", createdAt }`
-- 404 캠페인/템플릿이 내 소유 아님 · 409 slug 중복 · 400 형식
+- 404 캠페인/템플릿이 내 소유 아님 · 409 slug 중복(DB 유니크 제약) · 400 형식
 
 ### GET `/api/forms?campaignId=` → 목록 (+ `campaign`, `template`, `_count`)
 ### GET `/api/forms/:id` → 상세 + `links[]`
@@ -120,7 +120,7 @@
   }]
 }
 ```
-`pageSize` 최대 100.
+`page`·`pageSize` 는 정수, `pageSize` 최대 100 (형식 오류는 400). `channel` 로 채널 필터.
 
 ---
 

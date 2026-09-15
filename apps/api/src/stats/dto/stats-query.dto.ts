@@ -1,4 +1,5 @@
-import { ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiPropertyOptional, IntersectionType } from '@nestjs/swagger';
+import { PaginationDto } from '../../common/pagination.dto';
 import { Transform } from 'class-transformer';
 import { IsBoolean, IsIn, IsISO8601, IsOptional, IsUUID } from 'class-validator';
 import { CHANNELS, Channel } from '@glowuprizz/shared';
@@ -21,7 +22,7 @@ export class StatsQueryDto {
   compare?: boolean;
 }
 
-export class VisitorsQueryDto extends StatsQueryDto {
+export class VisitorsQueryDto extends IntersectionType(StatsQueryDto, PaginationDto) {
   @ApiPropertyOptional({ enum: ['FORM_VIEW', 'FORM_START', 'SUBMIT_ATTEMPT'], description: '이 단계까지는 도달한 방문자', default: 'FORM_START' })
   @IsOptional() @IsIn(['FORM_VIEW', 'FORM_START', 'SUBMIT_ATTEMPT']) stage?: 'FORM_VIEW' | 'FORM_START' | 'SUBMIT_ATTEMPT';
 
@@ -29,6 +30,4 @@ export class VisitorsQueryDto extends StatsQueryDto {
   @IsOptional() @Transform(({ value }) => value === true || value === 'true' || value === '1') @IsBoolean()
   submitted?: boolean;
 
-  @ApiPropertyOptional({ default: 1 }) @IsOptional() @Transform(({ value }) => Number(value)) page?: number;
-  @ApiPropertyOptional({ default: 20 }) @IsOptional() @Transform(({ value }) => Number(value)) pageSize?: number;
 }

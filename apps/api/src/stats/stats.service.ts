@@ -7,9 +7,15 @@ import { normalizePage } from '../common/pagination';
 import { StatsQueryDto, VisitorsQueryDto } from './dto/stats-query.dto';
 import { DAY_MS, Period, resolvePeriod, startOfKstDay } from './period';
 import { StageGroup, emptyGroup, funnelSnapshot, kstDay, num, rate, stageList } from './metrics';
-import { loadJourneys } from './journey';
+import { loadJourneys } from '../common/journey';
 
 const FAILURE_ROWS = 20;
+/** 주목점 규칙 임계값 */
+const INSIGHT = { minVisitors: 20, minChannelViews: 10, lowReach: 0.9, errorRate: 0.05 } as const;
+const INSIGHT_HINT: Record<string, string> = {
+  FORM_VIEW: '링크 미리보기·랜딩 속도·봇 유입 점검', FORM_START: '첫 화면에 입력칸이 보이는지, 카피·디자인 점검',
+  SUBMIT_ATTEMPT: '필수 항목 수·동의 체크 위치 점검', SUBMIT_SUCCESS: '제출 실패 사유 확인',
+};
 
 interface Scope { operatorId: string; campaignId?: string; formId?: string; channel?: Channel }
 type TypeRow = { key: string | null; type: string; visitors: bigint; events: bigint };
@@ -257,24 +263,21 @@ export class StatsService {
       return { channel, ...g.stages, clickToSubmit: rate(g.stages.SUBMIT_SUCCESS, g.stages.VIEW), share: rate(g.stages.SUBMIT_SUCCESS, totalSubmissions) };
     });
     const notes: { level: 'warn' | 'info'; text: string }[] = [];
-    if (cur.stages[0].visitors < 20) return notes; // 표본 부족
+    if (cur.stages[0].visitors < INSIGHT.minVisitors) return notes; // 표본 부족
     if (cur.maxDropStage) {
       const st = cur.stages.find((x) => x.type === cur.maxDropStage)!;
-      const hint: Record<string, string> = {
-        FORM_VIEW: '링크 미리보기·랜딩 속도·봇 유입 점검', FORM_START: '첫 화면에 입력칸이 보이는지, 카피·디자인 점검',
-        SUBMIT_ATTEMPT: '필수 항목 수·동의 체크 위치 점검', SUBMIT_SUCCESS: '제출 실패 사유 확인',
-      };
-      notes.push({ level: 'warn', text: `${st.label} 단계 이탈 ${Math.round((1 - st.stepRate) * 100)}% 로 가장 큼 — ${hint[st.type] ?? ''}` });
+      notes.push({ level: 'warn', text: `${st.label} 단계 이탈 ${Math.round((1 - st.stepRate) * 100)}% 로 가장 큼 — ${INSIGHT_HINT[st.type] ?? ''}` });
     }
-    const active = ch.filter((c) => c.VIEW >= 10);
+    const active = ch.filter((c) => c.VIEW >= INSIGHT.minChannelViews);
     if (active.length >= 2) {
       const worstReach = active.reduce((a, b) => (rate(b.FORM_VIEW, b.VIEW) < rate(a.FORM_VIEW, a.VIEW) ? b : a));
       const reach = rate(worstReach.FORM_VIEW, worstReach.VIEW);
-      if (reach < 0.9) notes.push({ level: 'warn', text: `${label(worstReach.channel)} 채널 폼 도달률 ${Math.round(reach * 100)}% 로 최저 — 링크 미리보기·랜딩 속도 점검` });
+      if (reach < INSIGHT.lowReach) notes.push({ level: 'warn', text: `${label(worstReach.channel)} 채널 폼 도달률 ${Math.round(reach * 100)}% 로 최저 — 링크 미리보기·랜딩 속도 점검` });
       const best = active.reduce((a, b) => (b.clickToSubmit > a.clickToSubmit ? b : a));
       notes.push({ level: 'info', text: `${label(best.channel)} 채널 전환율 ${Math.round(best.clickToSubmit * 100)}% 로 최고 (신청 기여 ${Math.round(best.share * 100)}%)` });
     }
-    if (cur.submitErrors > 0 && cur.submitErrors >= cur.stages[4].visitors * 0.05) {
+    const success = cur.stages.find((x) => x.type === 'SUBMIT_SUCCESS')!;
+    if (cur.submitErrors > 0 && cur.submitErrors >= success.visitors * INSIGHT.errorRate) {
       notes.push({ level: 'warn', text: `제출 실패 ${cur.submitErrors}건 — 실패 사유 확인` });
     }
     return notes;
