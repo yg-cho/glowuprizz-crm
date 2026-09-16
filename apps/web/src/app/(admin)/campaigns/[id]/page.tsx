@@ -7,7 +7,7 @@ import { Plus, Trash2 } from 'lucide-react';
 import { PageTitle } from '@/components/shell';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { FormField } from '@/components/form-field';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { StatusBadge } from '@/components/channel-badge';
@@ -100,16 +100,17 @@ export default function CampaignDetail() {
       <div className="grid gap-3 lg:grid-cols-3">
         <Section title="새 신청 폼" desc="HTML 템플릿을 선택해 이 캠페인의 폼을 만듭니다.">
           <form onSubmit={(e) => { e.preventDefault(); createForm.run(); }} className="flex flex-col gap-3">
-            <div><Label htmlFor="form-name">폼 이름</Label><Input id="form-name" value={name} onChange={(e) => setName(e.target.value)} required /></div>
-            <div>
-              <Label htmlFor="form-template">HTML 템플릿</Label>
+            <FormField htmlFor="form-name" label="폼 이름"><Input id="form-name" value={name} onChange={(e) => setName(e.target.value)} required /></FormField>
+            <FormField
+              htmlFor="form-template" label="HTML 템플릿"
+              hint={templates?.length === 0 && <Link href="/templates" className="text-xs underline">템플릿 등록하기</Link>}
+            >
               <Select value={templateId} onValueChange={setTemplateId} disabled={!templates?.length}>
-                <SelectTrigger id="form-template"><SelectValue placeholder={templates?.length === 0 ? '템플릿을 먼저 등록하세요' : '템플릿 선택'} /></SelectTrigger>
+                <SelectTrigger id="form-template" className="w-full"><SelectValue placeholder={templates?.length === 0 ? '템플릿을 먼저 등록하세요' : '템플릿 선택'} /></SelectTrigger>
                 <SelectContent>{templates?.map((t) => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}</SelectContent>
               </Select>
-              {templates?.length === 0 && <Link href="/templates" className="text-xs underline">템플릿 등록하기</Link>}
-            </div>
-            <div><Label htmlFor="form-slug">슬러그 (선택, 소문자·숫자·하이픈)</Label><Input id="form-slug" value={slug} onChange={(e) => setSlug(e.target.value)} placeholder="자동 생성" /></div>
+            </FormField>
+            <FormField htmlFor="form-slug" label="슬러그 (선택, 소문자·숫자·하이픈)"><Input id="form-slug" value={slug} onChange={(e) => setSlug(e.target.value)} placeholder="자동 생성" /></FormField>
             <ErrorText>{createForm.error}</ErrorText>
             <Button type="submit" disabled={!templateId || createForm.busy}><Plus /> 폼 만들기</Button>
           </form>

@@ -6,7 +6,7 @@ import { Plus } from 'lucide-react';
 import { PageTitle } from '@/components/shell';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { FormField } from '@/components/form-field';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
 import { ErrorText } from '@/components/error-text';
 import { EmptyRow } from '@/components/empty-row';
@@ -31,8 +31,8 @@ export default function CampaignsPage() {
       <div className="grid gap-3 lg:grid-cols-3">
         <Section title="새 캠페인">
           <form onSubmit={(e) => { e.preventDefault(); create.run(); }} className="flex flex-col gap-3">
-            <div><Label htmlFor="camp-name">이름</Label><Input id="camp-name" value={name} onChange={(e) => setName(e.target.value)} required placeholder="예) 9월 무료 PT 체험" /></div>
-            <div><Label htmlFor="camp-desc">설명 (선택)</Label><Input id="camp-desc" value={description} onChange={(e) => setDescription(e.target.value)} /></div>
+            <FormField htmlFor="camp-name" label="이름"><Input id="camp-name" value={name} onChange={(e) => setName(e.target.value)} required placeholder="예) 9월 무료 PT 체험" /></FormField>
+            <FormField htmlFor="camp-desc" label="설명 (선택)"><Input id="camp-desc" value={description} onChange={(e) => setDescription(e.target.value)} /></FormField>
             <ErrorText>{create.error}</ErrorText>
             <Button type="submit" disabled={create.busy}><Plus /> 생성</Button>
           </form>

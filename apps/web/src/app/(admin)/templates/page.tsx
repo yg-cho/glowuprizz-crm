@@ -5,7 +5,7 @@ import { Upload, Trash2, Eye } from 'lucide-react';
 import { PageTitle } from '@/components/shell';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { FormField } from '@/components/form-field';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
 import { ConfirmButton } from '@/components/confirm-button';
 import { ErrorText } from '@/components/error-text';
@@ -41,8 +41,8 @@ export default function TemplatesPage() {
       <div className="grid gap-3 lg:grid-cols-3">
         <Section title="새 템플릿 등록" desc=".html, 최대 512KB">
           <form onSubmit={(e) => { e.preventDefault(); upload.run(); }} className="flex flex-col gap-3">
-            <div><Label htmlFor="tpl-name">이름 (선택)</Label><Input id="tpl-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="미입력 시 파일명" /></div>
-            <div><Label htmlFor="tpl-file">HTML 파일</Label><Input id="tpl-file" ref={fileRef} type="file" accept=".html,.htm,text/html" className="py-1.5" /></div>
+            <FormField htmlFor="tpl-name" label="이름 (선택)"><Input id="tpl-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="미입력 시 파일명" /></FormField>
+            <FormField htmlFor="tpl-file" label="HTML 파일"><Input id="tpl-file" ref={fileRef} type="file" accept=".html,.htm,text/html" className="py-1.5" /></FormField>
             <ErrorText>{upload.error}</ErrorText>
             <Button type="submit" disabled={upload.busy}><Upload /> {upload.busy ? '업로드 중…' : '등록'}</Button>
           </form>
