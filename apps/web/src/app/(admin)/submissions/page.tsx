@@ -1,42 +1,15 @@
-'use client';
-
-import { useState } from 'react';
-import { PageTitle } from '@/components/shell';
-import { Card, CardContent } from '@/components/ui/card';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { FiltersBar } from '@/components/stats/filters-bar';
-import { SubmittedList } from '@/components/crm/submitted-list';
-import { AbandonedList } from '@/components/crm/abandoned-list';
-import { useStatsFilters } from '@/lib/stats-filters';
-import { useApi } from '@/lib/use-api';
+import { serverGet } from '@/lib/api-server';
+import { parseStatsFilters, toParams } from '@/lib/stats-query';
+import { submissionsQuery, type SubmissionPage } from '@/lib/submissions-query';
 import type { Campaign } from '@/lib/api';
+import { SubmissionsView } from './view';
 
-type Mode = 'submitted' | 'abandoned';
-
-export default function SubmissionsView() {
-  const { filters, set, query } = useStatsFilters({ range: 'all' });
-  const [mode, setMode] = useState<Mode>('submitted');
-  const { data: campaigns } = useApi<Campaign[]>('/campaigns');
-
-  return (
-    <>
-      <PageTitle title="CRM 명단" desc="신청자 한 명이 어느 채널로 몇 번 들어와 언제 썼는지. '작성만 하고 미신청'은 리마케팅 후보(방문자 쿠키 기준)." />
-      <FiltersBar
-        filters={filters} onChange={set} campaigns={campaigns ?? []} hideRange={mode === 'submitted'}
-        right={
-          <Tabs value={mode} onValueChange={(v) => setMode(v as Mode)}>
-            <TabsList aria-label="상태"><TabsTrigger value="submitted">신청 완료</TabsTrigger><TabsTrigger value="abandoned">작성만 하고 미신청</TabsTrigger></TabsList>
-          </Tabs>
-        }
-      />
-      <Card>
-        <CardContent className="p-5">
-          {mode === 'submitted'
-            ? <SubmittedList campaignId={filters.campaignId} formId={filters.formId} channel={filters.channel} />
-            : <AbandonedList statsQuery={query()} />}
-        </CardContent>
-      </Card>
-    </>
-  );
+/** 첫 화면에 보이는 것(캠페인 선택지 + 신청 완료 명단 1쪽)만 서버에서 받아둔다. */
+export default async function SubmissionsPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  const f = parseStatsFilters(toParams(await searchParams), { range: 'all' });
+  const [campaigns, submissions] = await Promise.all([
+    serverGet<Campaign[]>('/campaigns'),
+    serverGet<SubmissionPage>(`/submissions?${submissionsQuery({ campaignId: f.campaignId, formId: f.formId, channel: f.channel })}`),
+  ]);
+  return <SubmissionsView initialCampaigns={campaigns} initialSubmissions={submissions} />;
 }
-
