@@ -10,7 +10,7 @@
     "build": "turbo run build",
     "lint": "turbo run lint",
     "test": "turbo run test",
-    "test:e2e": "turbo run test:e2e --concurrency=1",
+    "test:e2e": "turbo run test:e2e",
     "db:generate": "pnpm --filter @glowuprizz/db generate",
     "db:migrate": "pnpm --filter @glowuprizz/db migrate:dev",
     "db:deploy": "pnpm --filter @glowuprizz/db migrate:deploy",

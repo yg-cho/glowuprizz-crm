@@ -36,7 +36,7 @@ pnpm dev                                      # api :3001, forms :3002, web :300
 
 ## 테스트 방법
 
-테스트는 실제 PostgreSQL(테스트 컨테이너, 포트 5433)을 사용합니다. 각 테스트 파일 시작 시 마이그레이션을 적용하고 테이블을 비웁니다.
+테스트는 실제 PostgreSQL(테스트 컨테이너, 포트 5433)을 사용합니다. 관리자 API 와 공개 폼은 서로 다른 테스트 DB(`glowuprizz_test`, `glowuprizz_test_forms`)를 써서 함께 돌려도 간섭하지 않습니다. 각 테스트 파일 시작 시 마이그레이션을 적용하고 테이블을 비웁니다. `NODE_ENV=test` 에서는 요청 수 제한을 건너뜁니다.
 
 ```bash
 pnpm install
@@ -49,7 +49,7 @@ pnpm --filter @glowuprizz/api test:e2e
 # 2) 공개 폼 e2e — 링크 렌더/스크립트 주입/CSP 헤더, 방문·방문자 집계, 이벤트 수집·토큰 검증, 제출 성공/실패, 일시중지
 pnpm --filter @glowuprizz/forms test:e2e
 
-# 1)+2) 한 번에 (순차 실행)
+# 1)+2) 한 번에
 pnpm test:e2e
 ```
 

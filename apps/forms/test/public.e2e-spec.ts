@@ -86,7 +86,7 @@ describe('Public forms (e2e)', () => {
       const r = await request(app.getHttpServer()).get(`/l/${igCode}`).expect(403);
       expect(r.headers['content-type']).toMatch(/text\/html/);
       expect(r.text).toContain('신청이 마감되었습니다');
-      expect(await prisma.event.count()).toBe(0);
+      expect(await prisma.event.count({ where: { formId } })).toBe(0);
     });
 
     it('HEAD 요청은 렌더하지만 VIEW 를 기록하지 않음', async () => {
@@ -155,7 +155,7 @@ describe('Public forms (e2e)', () => {
       await request(app.getHttpServer()).post('/f/my-form/submissions').set('Cookie', other.cookie).set('x-gu-token', other.token).send({ fields: { a: 'b' } }).expect(403);
       // 토큰은 맞지만 쿠키를 다른 UUID 로 바꿈
       await request(app.getHttpServer()).post('/f/my-form/submissions').set('Cookie', 'gu_vid=11111111-1111-4111-8111-111111111111').set('x-gu-token', ses.token).send({ fields: { a: 'b' } }).expect(403);
-      expect(await prisma.submission.count()).toBe(0);
+      expect(await prisma.submission.count({ where: { formId } })).toBe(0);
     });
 
     it('필드 키 형식 검증: 공백·특수문자·100자 초과·__proto__ 거부', async () => {
@@ -185,7 +185,7 @@ describe('Public forms (e2e)', () => {
       await post('/f/nope/submissions', ses).send({ fields: { a: 'b' } }).expect(403); // slug 불일치 토큰
       await prisma.form.update({ where: { id: formId }, data: { status: 'PAUSED' } });
       await post('/f/my-form/submissions', ses).send({ fields: { a: 'b' } }).expect(403);
-      expect(await prisma.submission.count()).toBe(0);
+      expect(await prisma.submission.count({ where: { formId } })).toBe(0);
     });
 
     it('긴 값은 2000자로 절단', async () => {
@@ -226,7 +226,7 @@ describe('Public forms (e2e)', () => {
       await request(app.getHttpServer()).post('/f/my-form/events').set('x-gu-token', ses.token).send({ type: 'form_view' }).expect(403);
       const other = await session(`/l/${otherFormCode}`);
       await request(app.getHttpServer()).post('/f/my-form/events').set('Cookie', other.cookie).set('x-gu-token', other.token).send({ type: 'form_view' }).expect(403);
-      expect(await prisma.event.count({ where: { type: 'FORM_VIEW' } })).toBe(0);
+      expect(await prisma.event.count({ where: { formId, type: 'FORM_VIEW' } })).toBe(0);
     });
 
     it('실패: 서버 전용 타입(view/submit_success)·미지 타입 400, meta 1KB 초과 400, 일시중지 403', async () => {
