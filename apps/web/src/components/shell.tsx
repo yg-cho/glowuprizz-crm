@@ -1,8 +1,8 @@
 'use client';
 
-import Link from 'next/link';
+import Link, { useLinkStatus } from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { BarChart3, FileCode2, FolderKanban, ListChecks, LogOut, Users } from 'lucide-react';
+import { BarChart3, FileCode2, FolderKanban, ListChecks, Loader2, LogOut, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { api } from '@/lib/api';
 
@@ -34,6 +34,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
                 className={cn('flex items-center gap-2 rounded-md px-3 py-2 text-sm', active ? 'bg-primary text-primary-foreground' : 'text-foreground/80 hover:bg-muted')}
                 aria-current={active ? 'page' : undefined}>
                 <n.icon className="h-4 w-4" /> {n.label}
+                <NavPending />
               </Link>
             );
           })}
@@ -45,6 +46,15 @@ export function Shell({ children }: { children: React.ReactNode }) {
       <main className="flex-1 p-8">{children}</main>
     </div>
   );
+}
+
+/**
+ * 이동 중인 링크에만 도는 표시. 서버에서 첫 데이터를 받아오는 동안 이전 화면을 그대로 두기 때문에
+ * (라우트 폴백을 쓰지 않는다) 누른 링크에 진행 중임을 알리는 표시가 필요하다.
+ */
+function NavPending() {
+  const { pending } = useLinkStatus();
+  return pending ? <Loader2 className="ml-auto h-3.5 w-3.5 animate-spin" role="status" aria-label="이동 중" /> : null;
 }
 
 export function PageTitle({ title, desc, right }: { title: string; desc?: string; right?: React.ReactNode }) {
