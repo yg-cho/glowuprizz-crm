@@ -18,17 +18,22 @@ export interface ApiState<T> {
  * GET 한 번을 상태로. path 가 null 이면 요청하지 않는다(선행 데이터 대기).
  * path 가 바뀌면 다시 요청하되 **이전 데이터를 지우지 않는다** — 새 값이 오기 전까지 이전 화면을 유지하고
  * (stale-while-revalidate) 길어질 때만 pending 으로 흐리게 표시한다. 늦게 도착한 이전 응답은 버린다.
+ *
+ * initial 은 서버 컴포넌트가 미리 받아둔 값(serverGet). 주어지면 그 값으로 시작하고 첫 요청을 건너뛴다.
  */
-export function useApi<T>(path: string | null): ApiState<T> {
-  const [data, setData] = useState<T | null>(null);
-  const [loading, setLoading] = useState(!!path);
+export function useApi<T>(path: string | null, initial?: T | null): ApiState<T> {
+  const [data, setData] = useState<T | null>(initial ?? null);
+  const [loading, setLoading] = useState(!!path && initial == null);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
   const seq = useRef(0);
+  // 서버가 준 첫 데이터는 방금 받아온 것이라 마운트 직후 한 번은 다시 부르지 않는다
+  const prefetched = useRef(initial != null);
 
   useEffect(() => {
     if (!path) { setData(null); setLoading(false); return; }
+    if (prefetched.current) { prefetched.current = false; return; }
     const mine = ++seq.current;
     setLoading(true); setError(null);
     api.get<T>(path)
