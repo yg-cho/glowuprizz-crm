@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ChannelBadge } from '@/components/channel-badge';
 import { JourneyTimeline } from '@/components/stats/journey-timeline';
 import { Pager } from './pager';
@@ -13,13 +13,14 @@ const PAGE = 20;
 /** 작성 시작했지만 미신청 방문자(리마케팅 후보). 여정을 바로 펼쳐 보인다. */
 export function AbandonedList({ statsQuery }: { statsQuery: string }) {
   const [page, setPage] = useState(1);
-  const { data, loading, error } = useApi<{ total: number; items: VisitorRow[] }>(`/stats/visitors?${statsQuery}&stage=FORM_START&submitted=false&page=${page}&pageSize=${PAGE}`);
+  useEffect(() => { setPage(1); }, [statsQuery]);
+  const { data, pending, error } = useApi<{ total: number; items: VisitorRow[] }>(`/stats/visitors?${statsQuery}&stage=FORM_START&submitted=false&page=${page}&pageSize=${PAGE}`);
   return (
     <>
       <div className="mb-3 text-sm text-muted-foreground">총 {fmtNum(data?.total ?? 0)}명 · 작성은 시작했지만 신청하지 않은 방문자. 개인정보 없음.</div>
       <div className="space-y-2">
         {error && <p className="py-4 text-sm text-destructive">{error}</p>}
-        {!error && (data?.items ?? []).length === 0 && <p className="py-8 text-center text-sm text-muted-foreground">{loading ? '불러오는 중…' : '해당 방문자가 없습니다.'}</p>}
+        {!error && (data?.items ?? []).length === 0 && <p className="py-8 text-center text-sm text-muted-foreground">{pending ? '불러오는 중…' : '해당 방문자가 없습니다.'}</p>}
         {data?.items.map((v) => (
           <div key={v.visitorId} className="rounded-lg border p-3">
             <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2 text-sm">

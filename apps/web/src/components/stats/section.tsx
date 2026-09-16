@@ -7,7 +7,7 @@ interface Props {
   desc?: string;
   className?: string;
   /** useApi 상태를 넘기면 로딩·에러를 섹션이 대신 표시한다 */
-  state?: { loading: boolean; error: string | null };
+  state?: { loading: boolean; pending: boolean; error: string | null };
   children: React.ReactNode;
 }
 
@@ -19,7 +19,7 @@ export function Section({ title, desc, className, state, children }: Props) {
         <h3 className="text-sm font-semibold leading-none">{title}</h3>
         {desc && <p className="text-xs text-muted-foreground">{desc}</p>}
       </CardHeader>
-      <CardContent className={cn(state?.loading && 'opacity-50 transition-opacity')}>
+      <CardContent className={cn('transition-opacity', state?.pending && 'opacity-50')}>
         {state?.error ? <ErrorText>{state.error}</ErrorText> : children}
       </CardContent>
     </Card>

@@ -32,8 +32,8 @@ export default function SubmissionsView() {
       <Card>
         <CardContent className="p-5">
           {mode === 'submitted'
-            ? <SubmittedList key={`${filters.campaignId}-${filters.formId}-${filters.channel}`} campaignId={filters.campaignId} formId={filters.formId} channel={filters.channel} />
-            : <AbandonedList key={query()} statsQuery={query()} />}
+            ? <SubmittedList campaignId={filters.campaignId} formId={filters.formId} channel={filters.channel} />
+            : <AbandonedList statsQuery={query()} />}
         </CardContent>
       </Card>
     </>
