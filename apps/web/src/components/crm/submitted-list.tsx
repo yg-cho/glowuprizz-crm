@@ -10,6 +10,7 @@ import { ChannelBadge } from '@/components/channel-badge';
 import { JourneyTimeline } from '@/components/stats/journey-timeline';
 import { Pager } from './pager';
 import { useApi } from '@/lib/use-api';
+import { submissionsQuery, type SubmissionPage } from '@/lib/submissions-query';
 import { api, Journey, Submission } from '@/lib/api';
 import { duration, fmtDate, fmtNum } from '@/lib/format';
 
@@ -20,19 +21,18 @@ interface Props {
   pageSize?: number;
   /** 캠페인/폼 열 숨김 (폼 상세처럼 문맥이 정해진 곳) */
   compact?: boolean;
+  /** 서버가 미리 받아둔 첫 페이지 */
+  initial?: SubmissionPage | null;
 }
 
 /** 신청 완료 명단. 행을 펼치면 방문자 여정을 불러온다. 필터는 전부 서버에서. */
-export function SubmittedList({ campaignId, formId, channel, pageSize = 20, compact }: Props) {
+export function SubmittedList({ campaignId, formId, channel, pageSize = 20, compact, initial }: Props) {
   const [page, setPage] = useState(1);
   const [open, setOpen] = useState<string | null>(null);
   const [journeys, setJourneys] = useState<Record<string, Journey | { error: string }>>({});
 
-  const q = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
-  if (campaignId) q.set('campaignId', campaignId);
-  if (formId) q.set('formId', formId);
-  if (channel) q.set('channel', channel);
-  const { data, error } = useApi<{ total: number; items: Submission[] }>(`/submissions?${q}`);
+  const q = submissionsQuery({ campaignId, formId, channel, page, pageSize });
+  const { data, error } = useApi<SubmissionPage>(`/submissions?${q}`, initial);
   // 필터가 바뀌면 첫 페이지로 (재마운트 없이)
   useEffect(() => { setPage(1); }, [campaignId, formId, channel]);
 
