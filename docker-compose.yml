@@ -21,6 +21,8 @@ services:
       POSTGRES_DB: glowuprizz_test
     ports: ["5433:5432"]
     tmpfs: [/var/lib/postgresql/data]
+    # api 용 glowuprizz_test 외에 forms 용 DB 를 하나 더 만든다 (e2e 격리)
+    volumes: [./docker/init-test-dbs.sql:/docker-entrypoint-initdb.d/init-test-dbs.sql:ro]
 
   api:
     build: { context: ., dockerfile: docker/api.Dockerfile }
