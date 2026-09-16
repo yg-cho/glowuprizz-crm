@@ -7,7 +7,7 @@ import { Pause, Play, Plus, Trash2 } from 'lucide-react';
 import { CHANNEL_OPTIONS, type Channel } from '@glowuprizz/shared';
 import { PageTitle } from '@/components/shell';
 import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
+import { FormField } from '@/components/form-field';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { StatusBadge } from '@/components/channel-badge';
 import { ConfirmButton } from '@/components/confirm-button';
@@ -56,13 +56,12 @@ export default function FormDetailPage() {
       <div className="grid gap-3 lg:grid-cols-3">
         <Section title="배포 링크 만들기" desc="채널별 고유 URL. 채널명은 URL에 노출되지 않습니다.">
           <form onSubmit={(e) => { e.preventDefault(); createLink.run(); }} className="flex flex-col gap-3">
-            <div>
-              <Label htmlFor="link-channel">채널</Label>
+            <FormField htmlFor="link-channel" label="채널">
               <Select value={channel} onValueChange={(v) => setChannel(v as Channel)}>
-                <SelectTrigger id="link-channel"><SelectValue /></SelectTrigger>
+                <SelectTrigger id="link-channel" className="w-full"><SelectValue /></SelectTrigger>
                 <SelectContent>{CHANNEL_OPTIONS.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}</SelectContent>
               </Select>
-            </div>
+            </FormField>
             <ErrorText>{createLink.error}</ErrorText>
             <Button type="submit" disabled={createLink.busy}><Plus /> 링크 생성</Button>
           </form>

@@ -8,7 +8,7 @@ import { api, ApiError } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { FormField } from '@/components/form-field';
 
 /** 같은 사이트의 경로만 허용 (// 나 절대 URL 은 오픈 리다이렉트) */
 const safeNext = (v: string | null) => (v && v.startsWith('/') && !v.startsWith('//') ? v : '/');
@@ -29,14 +29,12 @@ function LoginForm() {
 
   return (
     <form onSubmit={(e) => { e.preventDefault(); login.run(); }} className="flex flex-col gap-4">
-      <div>
-        <Label htmlFor="email">이메일</Label>
+      <FormField htmlFor="email" label="이메일">
         <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="username" />
-      </div>
-      <div>
-        <Label htmlFor="password">비밀번호</Label>
+      </FormField>
+      <FormField htmlFor="password" label="비밀번호">
         <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required autoComplete="current-password" />
-      </div>
+      </FormField>
       <ErrorText>{login.error}</ErrorText>
       <Button type="submit" disabled={login.busy}>{login.busy ? '로그인 중…' : '로그인'}</Button>
     </form>
