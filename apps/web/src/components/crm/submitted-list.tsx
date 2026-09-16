@@ -1,6 +1,6 @@
 'use client';
 
-import { Fragment, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import type { Channel } from '@glowuprizz/shared';
@@ -32,7 +32,9 @@ export function SubmittedList({ campaignId, formId, channel, pageSize = 20, comp
   if (campaignId) q.set('campaignId', campaignId);
   if (formId) q.set('formId', formId);
   if (channel) q.set('channel', channel);
-  const { data } = useApi<{ total: number; items: Submission[] }>(`/submissions?${q}`);
+  const { data, error } = useApi<{ total: number; items: Submission[] }>(`/submissions?${q}`);
+  // 필터가 바뀌면 첫 페이지로 (재마운트 없이)
+  useEffect(() => { setPage(1); }, [campaignId, formId, channel]);
 
   const toggle = (s: Submission) => {
     if (open === s.id) return setOpen(null);
@@ -49,6 +51,7 @@ export function SubmittedList({ campaignId, formId, channel, pageSize = 20, comp
   return (
     <>
       <div className="mb-3 text-sm text-muted-foreground">총 {fmtNum(data?.total ?? 0)}건</div>
+      {error && <p className="mb-2 text-sm text-destructive">{error}</p>}
       <Table>
         <TableHeader>
           <TableRow><TableHead className="w-6" /><TableHead>일시</TableHead>{!compact && <TableHead>캠페인 / 폼</TableHead>}<TableHead>채널</TableHead><TableHead>내용</TableHead></TableRow>
